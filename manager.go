@@ -333,9 +333,10 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 		m.srM.RUnlock()
 		return nil
 	}
-	m.wg.Add(1)
-	onTimeOutFn := m.onTimeOut
 	m.srM.RUnlock()
+
+	m.wg.Add(1)
+
 	var release = make(chan struct{})
 	var timeout = time.After(m.timeouts[0])
 
@@ -350,17 +351,17 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 	}
 
 	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
 		select {
 		case <-timeout:
-			if onTimeOutFn != nil {
-				onTimeOutFn(m.StagePS, calledFrom)
+			if m.onTimeOut != nil {
+				m.onTimeOut(m.StagePS, calledFrom)
 			}
 			if m.logLockTimeouts {
 				m.logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
 			}
 		case <-release:
 		}
-		wg.Done()
 	}(&m.wg)
 	return func() { close(release) }
 }

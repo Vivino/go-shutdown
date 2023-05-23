@@ -39,6 +39,7 @@ func startTimer(m *Manager, t *testing.T) chan struct{} {
 }
 
 func TestBasic(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
@@ -62,6 +63,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestPreShutdown(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	f := m.PreShutdown()
@@ -89,6 +91,7 @@ func TestPreShutdown(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
@@ -106,6 +109,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestCancel2(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	f2 := m.First()
@@ -137,6 +141,7 @@ func TestCancel2(t *testing.T) {
 }
 
 func TestCancelWait(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
@@ -155,6 +160,7 @@ func TestCancelWait(t *testing.T) {
 }
 
 func TestCancelWait2(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
@@ -189,6 +195,7 @@ func TestCancelWait2(t *testing.T) {
 // TestCancelWait3 assert that we can CancelWait, and that wait will wait until the
 // specified stage.
 func TestCancelWait3(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
@@ -242,6 +249,7 @@ func TestCancelWait3(t *testing.T) {
 // TestCancelWait4 assert that we can CancelWait on a previous stage,
 // and it doesn't block.
 func TestCancelWait4(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
@@ -311,6 +319,7 @@ func TestContextLog(t *testing.T) {
 }
 
 func TestFnCancelWait(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
@@ -344,6 +353,7 @@ func TestFnCancelWait(t *testing.T) {
 }
 
 func TestNilNotifier(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
@@ -368,6 +378,7 @@ func TestNilNotifier(t *testing.T) {
 }
 
 func TestNilNotifierCancel(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
@@ -391,6 +402,7 @@ func TestNilNotifierCancel(t *testing.T) {
 }
 
 func TestNilNotifierCancelWait(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
@@ -414,6 +426,7 @@ func TestNilNotifierCancelWait(t *testing.T) {
 }
 
 func TestNilNotifierFollowing(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
@@ -440,6 +453,7 @@ func TestNilNotifierFollowing(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	ok := make(chan bool)
@@ -463,6 +477,7 @@ func TestWait(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
@@ -484,6 +499,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestTimeoutN(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second * 2)
 	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
@@ -539,6 +555,7 @@ func TestTimeoutCallback(t *testing.T) {
 }
 
 func TestTimeoutN2(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	m.SetTimeoutN(m.Stage2, time.Second*2)
@@ -561,6 +578,7 @@ func TestTimeoutN2(t *testing.T) {
 }
 
 func TestLock(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 10)
 	defer close(startTimer(m, t))
@@ -607,6 +625,7 @@ func TestLock(t *testing.T) {
 }
 
 func TestLockUnrelease(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	m.SetTimeout(time.Millisecond * 500)
@@ -660,6 +679,7 @@ func TestLockCallback(t *testing.T) {
 }
 
 func TestOrder(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -730,6 +750,7 @@ func TestOrder(t *testing.T) {
 }
 
 func TestRecursive(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -776,6 +797,7 @@ func TestRecursive(t *testing.T) {
 }
 
 func TestBasicFn(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
@@ -799,6 +821,7 @@ func setBool(i *bool) func() {
 }
 
 func TestFnOrder(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -830,6 +853,7 @@ func TestFnOrder(t *testing.T) {
 }
 
 func TestFnRecursive(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -862,6 +886,7 @@ func TestFnRecursive(t *testing.T) {
 
 // When setting First or Second inside stage three they should be ignored.
 func TestFnRecursiveRev(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -893,6 +918,7 @@ func TestFnRecursiveRev(t *testing.T) {
 }
 
 func TestFnCancel(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
@@ -924,6 +950,7 @@ func TestFnCancel(t *testing.T) {
 }
 
 func TestFnCancelWait2(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
@@ -955,6 +982,7 @@ func TestFnCancelWait2(t *testing.T) {
 }
 
 func TestFnPanic(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
@@ -973,6 +1001,7 @@ func TestFnPanic(t *testing.T) {
 }
 
 func TestFnNotify(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
@@ -1067,6 +1096,7 @@ func TestStatusTimer(t *testing.T) {
 }
 
 func TestFnSingleCancel(t *testing.T) {
+	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 
@@ -1113,6 +1143,7 @@ func TestFnSingleCancel(t *testing.T) {
 }
 
 func TestCancelMulti(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
@@ -1148,6 +1179,7 @@ func TestCancelMulti(t *testing.T) {
 }
 
 func TestCancelMulti2(t *testing.T) {
+	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
@@ -1198,8 +1230,9 @@ func TestCancelMulti2(t *testing.T) {
 }
 
 func TestCancelWaitMulti(t *testing.T) {
+	t.Parallel()
 	m := New()
-	m.SetTimeout(time.Millisecond * 200)
+	m.SetTimeout(time.Millisecond * 400)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	for i := 0; i < 1000; i++ {
@@ -1232,8 +1265,9 @@ func TestCancelWaitMulti(t *testing.T) {
 }
 
 func TestCancelWaitMulti2(t *testing.T) {
+	t.Parallel()
 	m := New()
-	m.SetTimeout(time.Millisecond * 200)
+	m.SetTimeout(time.Millisecond * 400)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	var wg sync.WaitGroup
@@ -1357,7 +1391,8 @@ func ExampleWait() {
 	}
 
 	// ignore this reset, for test purposes only
-	m := New()
+	t.Parallel()
+m := New()
 
 	// Wait for the jobs above to finish
 	go func() {
