@@ -12,9 +12,9 @@ import (
 )
 
 // New returns an initialized shutdown manager
-func New() *Manager {
+func New(options ...Option) *Manager {
 	m := &Manager{
-		Logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
+		logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
 		StagePS:             Stage{0},
 		Stage1:              Stage{1},
 		Stage2:              Stage{2},
@@ -29,17 +29,14 @@ func New() *Manager {
 		shutdownRequestedCh: make(chan struct{}),
 		timeouts:            [4]time.Duration{5 * time.Second, 5 * time.Second, 5 * time.Second, 5 * time.Second},
 	}
+	for _, option := range options {
+		option(m)
+	}
 	return m
 }
 
 // Manager encapsulates all state/settings previously stored at package level
 type Manager struct {
-	// Logger used for output.
-	// This can be exchanged with your own.
-	Logger LogPrinter
-
-	// LoggerMu is a mutex for the Logger
-	LoggerMu sync.Mutex
 
 	// StagePS indicates the pre shutdown stage when waiting for locks to be released.
 	StagePS Stage
@@ -68,6 +65,10 @@ type Manager struct {
 	// Should not be changed once shutdown has started.
 	StatusTimer time.Duration
 
+	// logger used for output.
+	// This can be exchanged with your own using WithLogPrinter option.
+	logger LogPrinter
+
 	sqM              sync.Mutex // Mutex for below
 	shutdownQueue    [4][]iNotifier
 	shutdownFnQueue  [4][]fnNotify
@@ -81,13 +82,6 @@ type Manager struct {
 
 	onTimeOut func(s Stage, ctx string)
 	wg        sync.WaitGroup
-}
-
-// SetLogPrinter will use the specified function to write logging information.
-func (m *Manager) SetLogPrinter(fn func(format string, v ...interface{})) {
-	m.LoggerMu.Lock()
-	m.Logger = logWrapper{w: fn}
-	m.LoggerMu.Unlock()
 }
 
 // OnTimeout allows you to get a notification if a shutdown stage times out.
@@ -232,13 +226,13 @@ func (m *Manager) Shutdown() {
 		if len(queue) == 0 {
 			continue
 		}
-		m.LoggerMu.Lock()
+
 		if stage == 0 {
-			m.Logger.Printf("Initiating shutdown %v", time.Now())
+			m.logger.Printf("Initiating shutdown %v", time.Now())
 		} else {
-			m.Logger.Printf("Shutdown stage %v", stage)
+			m.logger.Printf("Shutdown stage %v", stage)
 		}
-		m.LoggerMu.Unlock()
+
 		wait := make([]chan struct{}, len(queue))
 		var calledFrom []string
 		if m.LogLockTimeouts {
@@ -277,23 +271,19 @@ func (m *Manager) Shutdown() {
 				case <-wait[i]:
 					break wloop
 				case <-timeout:
-					m.LoggerMu.Lock()
 					if len(calledFrom) > 0 {
 						m.srM.RLock()
 						if onTimeOutFn != nil {
 							onTimeOutFn(Stage{n: stage}, calledFrom[i])
 						}
 						m.srM.RUnlock()
-						m.Logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
+						m.logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
 					}
-					m.Logger.Printf(m.ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
-					m.LoggerMu.Unlock()
+					m.logger.Printf(m.ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
 					break brwait
 				case <-tick:
 					if len(calledFrom) > 0 {
-						m.LoggerMu.Lock()
-						m.Logger.Printf(m.WarningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
-						m.LoggerMu.Unlock()
+						m.logger.Printf(m.WarningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
 					}
 				}
 			}
@@ -377,9 +367,7 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 				onTimeOutFn(m.StagePS, calledFrom)
 			}
 			if m.LogLockTimeouts {
-				m.LoggerMu.Lock()
-				m.Logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
-				m.LoggerMu.Unlock()
+				m.logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
 			}
 		case <-release:
 		}
@@ -407,10 +395,8 @@ func (m *Manager) onFunc(prio, depth int, fn func(), ctx []interface{}) Notifier
 			{
 				defer func() {
 					if r := recover(); r != nil {
-						m.LoggerMu.Lock()
-						m.Logger.Printf(m.ErrorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
-						m.Logger.Printf("%s", string(debug.Stack()))
-						m.LoggerMu.Unlock()
+						m.logger.Printf(m.ErrorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
+						m.logger.Printf("%s", string(debug.Stack()))
 					}
 					if c != nil {
 						close(c)

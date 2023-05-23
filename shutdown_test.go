@@ -16,26 +16,7 @@ import (
 	"time"
 )
 
-/*
-func reset(m *Manager) {
-	m.PreShutdown.SetTimeout(1 * time.Second)
-	m.sqM.Lock()
-	defer m.sqM.Unlock()
-	m.srM.Lock()
-	defer m.srM.Unlock()
-	m.wg = sync.WaitGroup{}
-	m.shutdownRequested = false
-	m.shutdownRequestedCh = make(chan struct{})
-	m.shutdownQueue = [4][]iNotifier{}
-	m.shutdownFnQueue = [4][]fnNotify{}
-	m.shutdownFinished = make(chan struct{})
-	m.currentStage = Stage{-1}
-	m.onTimeOut = nil
-}
-*/
-
 func startTimer(m *Manager, t *testing.T) chan struct{} {
-	m.SetLogPrinter(t.Logf)
 	finished := make(chan struct{}, 0)
 	m.srM.RLock()
 	var to time.Duration
@@ -64,11 +45,9 @@ func TestBasic(t *testing.T) {
 	f := m.First()
 	ok := false
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
 	}()
 	m.Shutdown()
 	if !ok {
@@ -304,11 +283,11 @@ func (l *logBuffer) WriteF(format string, a ...interface{}) {
 
 // TestContextLog assert that context is logged as expected.
 func TestContextLog(t *testing.T) {
-	m := New()
+	var buf = &logBuffer{fn: t.Logf}
+	m := New(WithLogPrinter(buf.WriteF))
 	defer close(startTimer(m, t))
 	m.SetTimeout(10 * time.Millisecond)
-	var buf = &logBuffer{fn: t.Logf}
-	m.SetLogPrinter(buf.WriteF)
+
 	txt1 := "arbitrary text"
 	txt2 := "something else"
 	txt3 := 456778
@@ -1037,22 +1016,19 @@ func TestStatusTimerFn(t *testing.T) {
 			}
 		}
 	}
-	m := New()
+	var b bytes.Buffer
+	m := New(WithLogPrinter(func(f string, val ...interface{}) {
+		b.WriteString(fmt.Sprintf(f+"\n", val...))
+	}))
 	m.FirstFn(func() {
 		time.Sleep(time.Millisecond * 100)
 	})
 	_, file, line, _ := runtime.Caller(0)
 	want := fmt.Sprintf("%s:%d", file, line-3)
 
-	old := m.Logger
-	var b bytes.Buffer
-	m.SetLogPrinter(func(f string, val ...interface{}) {
-		b.WriteString(fmt.Sprintf(f+"\n", val...))
-	})
 	m.StatusTimer = time.Millisecond
 	m.Shutdown()
-	m.Logger = old
-	m.StatusTimer = time.Minute
+
 	if !strings.Contains(b.String(), want) {
 		t.Errorf("Expected logger to contain trace to %s, got: %v", want, b.String())
 	}
@@ -1066,7 +1042,10 @@ func TestStatusTimerFn(t *testing.T) {
 }
 
 func TestStatusTimer(t *testing.T) {
-	m := New()
+	var b bytes.Buffer
+	m := New(WithLogPrinter(func(f string, val ...interface{}) {
+		b.WriteString(fmt.Sprintf(f+"\n", val...))
+	}))
 	fn := m.First()
 	_, file, line, _ := runtime.Caller(0)
 	want := fmt.Sprintf("%s:%d", file, line-1)
@@ -1079,14 +1058,11 @@ func TestStatusTimer(t *testing.T) {
 		}
 	}()
 
-	old := m.Logger
-	var b bytes.Buffer
-	m.SetLogPrinter(func(f string, val ...interface{}) {
-		b.WriteString(fmt.Sprintf(f+"\n", val...))
-	})
+	old := m.logger
+
 	m.StatusTimer = time.Millisecond
 	m.Shutdown()
-	m.Logger = old
+	m.logger = old
 	m.StatusTimer = time.Minute
 	if !strings.Contains(b.String(), want) {
 		t.Errorf("Expected logger to contain trace to %s, got: %v", want, b.String())
