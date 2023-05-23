@@ -17,7 +17,6 @@ type otherContext struct {
 }
 
 func TestCancelCtx(t *testing.T) {
-	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
@@ -65,7 +64,6 @@ func TestCancelCtx(t *testing.T) {
 }
 
 func TestCancelCtxN(t *testing.T) {
-	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
@@ -115,7 +113,6 @@ func TestCancelCtxN(t *testing.T) {
 }
 
 func TestCancelCtxNShutdown(t *testing.T) {
-	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))

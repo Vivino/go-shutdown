@@ -11,7 +11,6 @@ import (
 )
 
 func TestWrapHandlerBasic(t *testing.T) {
-	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var finished = false
@@ -43,7 +42,6 @@ func TestWrapHandlerBasic(t *testing.T) {
 }
 
 func TestWrapHandlerFuncBasic(t *testing.T) {
-	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var finished = false
@@ -76,7 +74,6 @@ func TestWrapHandlerFuncBasic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerPanic(t *testing.T) {
-	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
@@ -105,7 +102,6 @@ func TestWrapHandlerPanic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerFuncPanic(t *testing.T) {
-	t.Parallel()
 	m := New()
 	m.SetTimeout(time.Millisecond * 200)
 	defer close(startTimer(m, t))
@@ -134,7 +130,6 @@ func TestWrapHandlerFuncPanic(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerOrder(t *testing.T) {
-	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var finished = make(chan bool)
@@ -190,7 +185,6 @@ func TestWrapHandlerOrder(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerFuncOrder(t *testing.T) {
-	t.Parallel()
 	m := New()
 	defer close(startTimer(m, t))
 	var finished = make(chan bool)
