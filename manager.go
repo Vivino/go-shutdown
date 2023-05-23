@@ -21,7 +21,7 @@ func New(options ...Option) *Manager {
 		Stage3:              Stage{3},
 		WarningPrefix:       "WARN: ",
 		ErrorPrefix:         "ERROR: ",
-		LogLockTimeouts:     true,
+		logLockTimeouts:     true,
 		StatusTimer:         time.Minute,
 		shutdownFinished:    make(chan struct{}),
 		currentStage:        Stage{-1},
@@ -56,14 +56,13 @@ type Manager struct {
 	// ErrorPrefix is printed before errors.
 	ErrorPrefix string
 
-	// LogLockTimeouts enables log timeout warnings
-	// and notifier status updates.
-	// Should not be changed once shutdown has started.
-	LogLockTimeouts bool
-
 	// StatusTimer is the time between logging which notifiers are waiting to finish.
 	// Should not be changed once shutdown has started.
 	StatusTimer time.Duration
+
+	// logLockTimeouts enables log timeout warnings
+	// and notifier status updates.
+	logLockTimeouts bool
 
 	// logger used for output.
 	// This can be exchanged with your own using WithLogPrinter option.
@@ -82,14 +81,6 @@ type Manager struct {
 
 	onTimeOut func(s Stage, ctx string)
 	wg        sync.WaitGroup
-}
-
-// OnTimeout allows you to get a notification if a shutdown stage times out.
-// The stage and the context of the hanging shutdown/lock function is returned.
-func (m *Manager) OnTimeout(fn func(Stage, string)) {
-	m.srM.Lock()
-	m.onTimeOut = fn
-	m.srM.Unlock()
 }
 
 // SetTimeout sets maximum delay to wait for each stage to finish.
@@ -128,42 +119,42 @@ func (m *Manager) PreShutdownFn(fn func(), ctx ...interface{}) Notifier {
 }
 
 // First returns a notifier that will be called in the first stage of shutdowns.
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) First(ctx ...interface{}) Notifier {
 	return m.onShutdown(1, 1, ctx).n
 }
 
 // FirstFn executes a function in the first stage of the shutdown
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) FirstFn(fn func(), ctx ...interface{}) Notifier {
 	return m.onFunc(1, 1, fn, ctx)
 }
 
 // Second returns a notifier that will be called in the second stage of shutdowns.
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) Second(ctx ...interface{}) Notifier {
 	return m.onShutdown(2, 1, ctx).n
 }
 
 // SecondFn executes a function in the second stage of the shutdown.
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) SecondFn(fn func(), ctx ...interface{}) Notifier {
 	return m.onFunc(2, 1, fn, ctx)
 }
 
 // Third returns a notifier that will be called in the third stage of shutdowns.
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) Third(ctx ...interface{}) Notifier {
 	return m.onShutdown(3, 1, ctx).n
 }
 
 // ThirdFn executes a function in the third stage of the shutdown.
-// If shutdown has started and this stage has already been reached, nil will be returned.
+// If shutdown has started and this stage has already been reached, the notifiers Valid() will be false.
 // The context is printed if LogLockTimeouts is enabled.
 func (m *Manager) ThirdFn(fn func(), ctx ...interface{}) Notifier {
 	return m.onFunc(3, 1, fn, ctx)
@@ -235,13 +226,13 @@ func (m *Manager) Shutdown() {
 
 		wait := make([]chan struct{}, len(queue))
 		var calledFrom []string
-		if m.LogLockTimeouts {
+		if m.logLockTimeouts {
 			calledFrom = make([]string, len(queue))
 		}
 		// Send notification to all waiting
 		for i, n := range queue {
 			wait[i] = make(chan struct{})
-			if m.LogLockTimeouts {
+			if m.logLockTimeouts {
 				calledFrom[i] = n.calledFrom
 			}
 			queue[i].n.c <- wait[i]
@@ -262,7 +253,7 @@ func (m *Manager) Shutdown() {
 	brwait:
 		for i := range wait {
 			var tick <-chan time.Time
-			if m.LogLockTimeouts {
+			if m.logLockTimeouts {
 				tick = time.NewTicker(m.StatusTimer).C
 			}
 		wloop:
@@ -272,11 +263,9 @@ func (m *Manager) Shutdown() {
 					break wloop
 				case <-timeout:
 					if len(calledFrom) > 0 {
-						m.srM.RLock()
 						if onTimeOutFn != nil {
 							onTimeOutFn(Stage{n: stage}, calledFrom[i])
 						}
-						m.srM.RUnlock()
 						m.logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
 					}
 					m.logger.Printf(m.ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
@@ -352,7 +341,7 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 
 	// Store what called this
 	var calledFrom string
-	if m.LogLockTimeouts {
+	if m.logLockTimeouts {
 		_, file, line, _ := runtime.Caller(1)
 		if len(ctx) > 0 {
 			calledFrom = fmt.Sprintf("%v. ", ctx)
@@ -366,7 +355,7 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 			if onTimeOutFn != nil {
 				onTimeOutFn(m.StagePS, calledFrom)
 			}
-			if m.LogLockTimeouts {
+			if m.logLockTimeouts {
 				m.logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
 			}
 		case <-release:
@@ -422,7 +411,7 @@ func (m *Manager) onShutdown(prio, depth int, ctx []interface{}) iNotifier {
 	}
 	n := m.newNotifier()
 	in := iNotifier{n: n}
-	if m.LogLockTimeouts {
+	if m.logLockTimeouts {
 		_, file, line, _ := runtime.Caller(depth + 1)
 		in.calledFrom = fmt.Sprintf("%s:%d", file, line)
 		if len(ctx) != 0 {

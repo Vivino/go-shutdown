@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -17,7 +18,7 @@ import (
 )
 
 func startTimer(m *Manager, t *testing.T) chan struct{} {
-	finished := make(chan struct{}, 0)
+	finished := make(chan struct{})
 	m.srM.RLock()
 	var to time.Duration
 	for i := range m.timeouts {
@@ -33,7 +34,6 @@ func startTimer(m *Manager, t *testing.T) chan struct{} {
 			panic("unexpected timeout while running test")
 		case <-finished:
 			return
-
 		}
 	}()
 	return finished
@@ -69,12 +69,10 @@ func TestPreShutdown(t *testing.T) {
 	ok := false
 	l := m.Lock()
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			l()
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		l()
+		close(n)
 	}()
 	tn := time.Now()
 	m.Shutdown()
@@ -97,11 +95,9 @@ func TestCancel(t *testing.T) {
 	f := m.First()
 	ok := false
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
 	}()
 	f.Cancel()
 	m.Shutdown()
@@ -143,15 +139,14 @@ func TestCancel2(t *testing.T) {
 
 func TestCancelWait(t *testing.T) {
 	m := New()
+	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
 	f := m.First()
-	ok := false
+	var ok bool
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
 	}()
 	f.CancelWait()
 	m.Shutdown()
@@ -162,6 +157,7 @@ func TestCancelWait(t *testing.T) {
 
 func TestCancelWait2(t *testing.T) {
 	m := New()
+	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
 	f2 := m.First()
 	f := m.First()
@@ -195,13 +191,14 @@ func TestCancelWait2(t *testing.T) {
 // specified stage.
 func TestCancelWait3(t *testing.T) {
 	m := New()
+	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2, ok3 bool
 	f2 := m.Second()
-	cancelled := make(chan struct{}, 0)
-	reached := make(chan struct{}, 0)
-	p2started := make(chan struct{}, 0)
+	cancelled := make(chan struct{})
+	reached := make(chan struct{})
+	p2started := make(chan struct{})
 	_ = m.SecondFn(func() {
 		<-p2started
 		close(reached)
@@ -217,22 +214,19 @@ func TestCancelWait3(t *testing.T) {
 	}()
 	wg.Add(1)
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			go func() {
-				wg.Done()
-				close(cancelled)
-				f2.CancelWait()
-				// We should be at stage 2
-				close(p2started)
-				<-reached
-			}()
-			wg.Wait()
-			time.Sleep(10 * time.Millisecond)
-			close(n)
-		}
-
+		n := <-f.Notify()
+		ok = true
+		go func() {
+			wg.Done()
+			close(cancelled)
+			f2.CancelWait()
+			// We should be at stage 2
+			close(p2started)
+			<-reached
+		}()
+		wg.Wait()
+		time.Sleep(10 * time.Millisecond)
+		close(n)
 	}()
 	m.Shutdown()
 	if !ok {
@@ -250,6 +244,7 @@ func TestCancelWait3(t *testing.T) {
 // and it doesn't block.
 func TestCancelWait4(t *testing.T) {
 	m := New()
+	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
 	f := m.Second()
 	var ok bool
@@ -365,8 +360,8 @@ func TestNilNotifier(t *testing.T) {
 		m.PreShutdownFn(func() {}), m.FirstFn(func() {}), m.SecondFn(func() {}), m.ThirdFn(func() {})}
 
 	for i := range tests {
-		if !tests[i].Valid() {
-			t.Errorf("Expected test %d to be nil, was %#v", i, tests[i])
+		if tests[i].Valid() {
+			t.Errorf("Expected test %d to be invalid, was %#v", i, tests[i].Valid())
 		}
 	}
 	close(finished)
@@ -512,23 +507,20 @@ func TestTimeoutN(t *testing.T) {
 }
 
 func TestTimeoutCallback(t *testing.T) {
-	m := New()
+	var gotStage Stage
+	var gotCtx string
+	m := New(WithOnTimeout(func(s Stage, ctx string) {
+		gotStage = s
+		gotCtx = ctx
+	}))
 	m.SetTimeout(time.Second * 2)
 	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
 	defer close(startTimer(m, t))
-	var gotStage Stage
-	var gotCtx string
-	m.OnTimeout(func(s Stage, ctx string) {
-		gotStage = s
-		gotCtx = ctx
-	})
-	defer m.OnTimeout(nil)
+
 	const testctx = "lock context"
 	f := m.First(testctx)
 	go func() {
-		select {
-		case <-f.Notify():
-		}
+		<-f.Notify()
 	}()
 	tn := time.Now()
 	m.Shutdown()
@@ -571,6 +563,7 @@ func TestTimeoutN2(t *testing.T) {
 
 func TestLock(t *testing.T) {
 	m := New()
+	m.SetTimeout(time.Millisecond * 10)
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -636,20 +629,19 @@ func TestLockUnrelease(t *testing.T) {
 }
 
 func TestLockCallback(t *testing.T) {
-	m := New()
-	defer close(startTimer(m, t))
-	m.SetTimeout(time.Millisecond * 50)
-	const testctx = "lock context"
 	var gotStage Stage
 	var gotCtx string
 	var wg sync.WaitGroup
 	wg.Add(1)
-	m.OnTimeout(func(s Stage, ctx string) {
+	m := New(WithOnTimeout(func(s Stage, ctx string) {
 		gotStage = s
 		gotCtx = ctx
 		wg.Done()
-	})
-	defer m.OnTimeout(nil)
+	}))
+	defer close(startTimer(m, t))
+	m.SetTimeout(time.Millisecond * 50)
+	const testctx = "lock context"
+
 	tn := time.Now()
 	got := m.Lock(testctx)
 	if got == nil {
@@ -692,46 +684,49 @@ func TestOrder(t *testing.T) {
 		t.Fatal("shutdown started unexpectedly")
 	}
 
-	var ok0, ok1, ok2, ok3 bool
+	sdOrder := make(chan int, 4)
 	go func() {
 		for {
 			select {
 			//t0 must be first
 			case n := <-t0.Notify():
-				if ok0 || ok1 || ok2 || ok3 {
-					t.Fatal("unexpected order", ok0, ok1, ok2, ok3)
-				}
-				ok0 = true
+				sdOrder <- 0
 				close(n)
 			case n := <-t1.Notify():
-				if !ok0 || ok1 || ok2 || ok3 {
-					t.Fatal("unexpected order", ok0, ok1, ok2, ok3)
-				}
-				ok1 = true
+				sdOrder <- 1
 				close(n)
 			case n := <-t2.Notify():
-				if !ok0 || !ok1 || ok2 || ok3 {
-					t.Fatal("unexpected order", ok0, ok1, ok2, ok3)
-				}
-				ok2 = true
+				sdOrder <- 2
 				close(n)
 			case n := <-t3.Notify():
-				if !ok0 || !ok1 || !ok2 || ok3 {
-					t.Fatal("unexpected order", ok0, ok1, ok2, ok3)
-				}
-				ok3 = true
+				sdOrder <- 3
 				close(n)
+			}
+			if len(sdOrder) == 4 {
+				close(sdOrder)
 				return
 			}
 		}
 	}()
-	if ok0 || ok1 || ok2 || ok3 {
-		t.Fatal("shutdown has already happened", ok0, ok1, ok2, ok3)
+	if len(sdOrder) > 0 {
+		t.Fatal("shutdown has already happened")
+	}
+	m.Shutdown()
+
+	if len(sdOrder) != 4 {
+		t.Fatalf("expected 4, got:%d", len(sdOrder))
 	}
 
-	m.Shutdown()
-	if !ok0 || !ok1 || !ok2 || !ok3 {
-		t.Fatal("did not get expected shutdown signal", ok0, ok1, ok2, ok3)
+	var res []int
+	for i := range sdOrder {
+		res = append(res, i)
+	}
+	last := -1
+	for _, v := range res {
+		if v <= last {
+			t.Fatalf("did not get expected shutdown signals %v", res)
+		}
+		last = v
 	}
 }
 
@@ -1049,21 +1044,17 @@ func TestStatusTimer(t *testing.T) {
 	fn := m.First()
 	_, file, line, _ := runtime.Caller(0)
 	want := fmt.Sprintf("%s:%d", file, line-1)
-
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		select {
-		case v := <-fn.Notify():
-			time.Sleep(100 * time.Millisecond)
-			close(v)
-		}
+		wg.Done()
+		v := <-fn.Notify()
+		time.Sleep(2 * time.Millisecond)
+		close(v)
 	}()
-
-	old := m.logger
-
 	m.StatusTimer = time.Millisecond
+	wg.Wait()
 	m.Shutdown()
-	m.logger = old
-	m.StatusTimer = time.Minute
 	if !strings.Contains(b.String(), want) {
 		t.Errorf("Expected logger to contain trace to %s, got: %v", want, b.String())
 	}
@@ -1188,20 +1179,16 @@ func TestCancelMulti2(t *testing.T) {
 			if r&1 == 0 {
 				n.Cancel()
 				wg.Done()
-				select {
-				case v, ok := <-n.Notify():
-					t.Errorf("Got notifier on %+v", n)
-					if ok {
-						close(v)
-					}
+				v, ok := <-n.Notify()
+				t.Errorf("Got notifier on %+v", n)
+				if ok {
+					close(v)
 				}
 			} else {
 				wg.Done()
-				select {
-				case v, ok := <-n.Notify():
-					if ok {
-						close(v)
-					}
+				v, ok := <-n.Notify()
+				if ok {
+					close(v)
 				}
 			}
 		}(n, rand.Intn(100))
@@ -1213,7 +1200,7 @@ func TestCancelMulti2(t *testing.T) {
 
 func TestCancelWaitMulti(t *testing.T) {
 	m := New()
-	m.SetTimeout(time.Second)
+	m.SetTimeout(time.Millisecond * 200)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	for i := 0; i < 1000; i++ {
@@ -1239,8 +1226,7 @@ func TestCancelWaitMulti(t *testing.T) {
 		go func(n Notifier, t time.Duration) {
 			time.Sleep(t)
 			n.CancelWait()
-		}(n, time.Millisecond*time.Duration(rand.Intn(250)))
-		time.Sleep(time.Millisecond)
+		}(n, time.Millisecond*time.Duration(rand.Intn(100)))
 	}
 	// Start shutdown
 	m.Shutdown()
@@ -1248,7 +1234,7 @@ func TestCancelWaitMulti(t *testing.T) {
 
 func TestCancelWaitMulti2(t *testing.T) {
 	m := New()
-	m.SetTimeout(time.Second)
+	m.SetTimeout(time.Millisecond * 200)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	var wg sync.WaitGroup
@@ -1277,12 +1263,10 @@ func TestCancelWaitMulti2(t *testing.T) {
 			if r%3 == 0 {
 				n.CancelWait()
 				wg.Done()
-				select {
-				case v, ok := <-n.Notify():
-					t.Errorf("Got notifier on %+v", n)
-					if ok {
-						close(v)
-					}
+				v, ok := <-n.Notify()
+				t.Errorf("Got notifier on %+v", n)
+				if ok {
+					close(v)
 				}
 			} else if r%2 == 1 {
 				wg.Done()
@@ -1290,26 +1274,23 @@ func TestCancelWaitMulti2(t *testing.T) {
 				n.CancelWait()
 			} else {
 				wg.Done()
-				select {
-				case v, ok := <-n.Notify():
-					if ok {
-						close(v)
-					}
+				v, ok := <-n.Notify()
+				if ok {
+					close(v)
 				}
 			}
-		}(n, rand.Intn(100))
+		}(n, rand.Intn(50))
 	}
 	wg.Wait()
 	// Start shutdown
 	m.Shutdown()
 }
 
-/*
 // Get a notifier and perform our own code when we shutdown
 func ExampleNotifier() {
 	shutdown := m.First()
-	select {
-	case n := <-shutdown:
+	if shutdown.Valid() {
+		n := <-shutdown.Notify()
 		// Do shutdown code ...
 
 		// Signal we are done
@@ -1319,7 +1300,7 @@ func ExampleNotifier() {
 
 // Get a notifier and perform our own function when we shutdown
 func Example_functions() {
-	_ = FirstFn(func() {
+	_ = m.FirstFn(func() {
 		// This function is called on shutdown
 		fmt.Println("First shutdown stage called")
 	})
@@ -1346,12 +1327,12 @@ func ExampleLock() {
 }
 
 // Change timeout for a single stage
-func Examplem.SetTimeoutN() {
+func ExampleSetTimeoutN() {
 	// Set timout for all stages
 	m.SetTimeout(time.Second)
 
 	// But give second stage more time
-	m.SetTimeoutN(Stage2, time.Second*10)
+	m.SetTimeoutN(m.Stage2, time.Second*10)
 }
 
 // This is an example, that could be your main function.
@@ -1395,4 +1376,3 @@ func ExampleWait() {
 	// Output: jobs done
 	// exiting main
 }
-*/

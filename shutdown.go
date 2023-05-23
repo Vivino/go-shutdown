@@ -50,7 +50,7 @@ type Notifier struct {
 
 // Valid returns true if it can be used as a notifier. If false shutdown has already started
 func (n Notifier) Valid() bool {
-	return n.m != nil
+	return n.c != nil && n.m != nil
 }
 
 // Notify returns a channel to listen to for shutdown events
@@ -64,7 +64,7 @@ func (n Notifier) Notify() <-chan chan struct{} {
 // If the shutdown has already started this will not have any effect,
 // but a goroutine will wait for the notifier to be triggered.
 func (s Notifier) Cancel() {
-	if s.c == nil {
+	if !s.Valid() {
 		return
 	}
 	s.m.srM.RLock()
@@ -112,10 +112,10 @@ func (s Notifier) Cancel() {
 
 // CancelWait will cancel a Notifier, or wait for it to become active if shutdown has been started.
 // This will remove a notifier from the shutdown queue, and it will not be signalled when shutdown starts.
-// If the notifier is nil (requested after its stage has started), it will return at once.
+// If the notifier is invalid (requested after its stage has started), it will return at once.
 // If the shutdown has already started, this will wait for the notifier to be called and close it.
 func (s Notifier) CancelWait() {
-	if s.c == nil {
+	if !s.Valid() {
 		return
 	}
 	s.m.sqM.Lock()

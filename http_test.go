@@ -209,18 +209,16 @@ func TestWrapHandlerOrder(t *testing.T) {
 	completed := make(chan bool)
 	testOK := make(chan bool)
 	go func() {
+		<-release
 		select {
-		case <-release:
-			select {
-			case <-finished:
-				panic("Shutdown was already finished")
-			case <-completed:
-				panic("Shutdown had already completed")
-			default:
-			}
-			close(wait)
-			close(testOK)
+		case <-finished:
+			panic("Shutdown was already finished")
+		case <-completed:
+			panic("Shutdown had already completed")
+		default:
 		}
+		close(wait)
+		close(testOK)
 	}()
 	<-waiting
 	tn := time.Now()
@@ -266,18 +264,16 @@ func TestWrapHandlerFuncOrder(t *testing.T) {
 	completed := make(chan bool)
 	testOK := make(chan bool)
 	go func() {
+		<-release
 		select {
-		case <-release:
-			select {
-			case <-finished:
-				panic("Shutdown was already finished")
-			case <-completed:
-				panic("Shutdown had already completed")
-			default:
-			}
-			close(wait)
-			close(testOK)
+		case <-finished:
+			panic("Shutdown was already finished")
+		case <-completed:
+			panic("Shutdown had already completed")
+		default:
 		}
+		close(wait)
+		close(testOK)
 	}()
 	<-waiting
 	tn := time.Now()
