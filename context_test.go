@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	xcontext "golang.org/x/net/context"
 )
 
 // otherContext is a Context that's not one of the types defined in context.go.
@@ -148,50 +146,4 @@ func TestCancelCtxNShutdown(t *testing.T) {
 
 	// Ensure shutdown is not blocking
 	m.Shutdown()
-}
-
-func TestCancelCtxX(t *testing.T) {
-	m := NewManager()
-	m.SetTimeout(time.Second)
-	defer close(startTimer(m, t))
-
-	c1, _ := m.CancelCtx(xcontext.Background())
-
-	if got, want := fmt.Sprint(c1), "context.Background.WithCancel"; got != want {
-		t.Errorf("c1.String() = %q want %q", got, want)
-	}
-
-	o := otherContext{c1}
-	c2, cc := xcontext.WithCancel(o)
-	defer cc()
-	contexts := []xcontext.Context{c1, o, c2}
-
-	for i, c := range contexts {
-		if d := c.Done(); d == nil {
-			t.Errorf("c[%d].Done() == %v want non-nil", i, d)
-		}
-		if e := c.Err(); e != nil {
-			t.Errorf("c[%d].Err() == %v want nil", i, e)
-		}
-
-		select {
-		case x := <-c.Done():
-			t.Errorf("<-c.Done() == %v want nothing (it should block)", x)
-		default:
-		}
-	}
-
-	m.Shutdown()
-	time.Sleep(100 * time.Millisecond) // let cancellation propagate
-
-	for i, c := range contexts {
-		select {
-		case <-c.Done():
-		default:
-			t.Errorf("<-c[%d].Done() blocked, but shouldn't have", i)
-		}
-		if e := c.Err(); e != context.Canceled {
-			t.Errorf("c[%d].Err() == %#v want %#v", i, e, context.Canceled)
-		}
-	}
 }
