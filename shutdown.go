@@ -67,9 +67,7 @@ func (s Notifier) Cancel() {
 	if !s.Valid() {
 		return
 	}
-	s.m.srM.RLock()
-	if s.m.shutdownRequested {
-		s.m.srM.RUnlock()
+	if s.m.shutdownRequested.Load() {
 		// Wait until we get the notification and close it:
 		go func() {
 			v := <-s.c
@@ -77,7 +75,6 @@ func (s Notifier) Cancel() {
 		}()
 		return
 	}
-	s.m.srM.RUnlock()
 	s.m.sqM.Lock()
 	var a chan chan struct{}
 	var b chan chan struct{}
@@ -147,16 +144,15 @@ func (s Notifier) CancelWait() {
 			}
 		}
 	}
-	s.m.srM.RLock()
-	if s.m.shutdownRequested {
+
+	if s.m.shutdownRequested.Load() {
 		s.m.sqM.Unlock()
-		s.m.srM.RUnlock()
+
 		// Wait until we get the notification and close it:
 		v := <-s.c
 		close(v)
 
 		return
 	}
-	s.m.srM.RUnlock()
 	s.m.sqM.Unlock()
 }

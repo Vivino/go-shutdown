@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,10 +26,10 @@ func New(options ...Option) *Manager {
 		StatusTimer:         time.Minute,
 		shutdownFinished:    make(chan struct{}),
 		currentStage:        Stage{-1},
-		shutdownRequested:   false,
 		shutdownRequestedCh: make(chan struct{}),
 		timeouts:            [4]time.Duration{5 * time.Second, 5 * time.Second, 5 * time.Second, 5 * time.Second},
 	}
+	m.shutdownRequested.Store(false)
 	for _, option := range options {
 		option(m)
 	}
@@ -75,7 +76,7 @@ type Manager struct {
 	currentStage     Stage
 
 	srM                 sync.RWMutex // Mutex for below
-	shutdownRequested   bool
+	shutdownRequested   atomic.Bool
 	shutdownRequestedCh chan struct{}
 	timeouts            [4]time.Duration
 
@@ -187,19 +188,19 @@ func (m *Manager) Exit(code int) {
 
 // Shutdown will signal all notifiers in three stages.
 // It will first check that all locks have been released - see Lock()
+// This method is not safe to call concurrently, as a datarace for shutdownRequested is possible.
+// As shutdown is called
 func (m *Manager) Shutdown() {
-	m.srM.Lock()
-	if m.shutdownRequested {
-		m.srM.Unlock()
+	// if the current value is false, then store true. If we couldn't store true,
+	// then shutdown is already initalized
+	if !m.shutdownRequested.CompareAndSwap(false, true) {
 		// Wait till shutdown finished
 		<-m.shutdownFinished
 		return
 	}
-	m.shutdownRequested = true
+
 	close(m.shutdownRequestedCh)
 	lwg := &m.wg
-	onTimeOutFn := m.onTimeOut
-	m.srM.Unlock()
 
 	// Add a pre-shutdown function that waits for all locks to be released.
 	m.PreShutdownFn(func() {
@@ -263,8 +264,8 @@ func (m *Manager) Shutdown() {
 					break wloop
 				case <-timeout:
 					if len(calledFrom) > 0 {
-						if onTimeOutFn != nil {
-							onTimeOutFn(Stage{n: stage}, calledFrom[i])
+						if m.onTimeOut != nil {
+							m.onTimeOut(Stage{n: stage}, calledFrom[i])
 						}
 						m.logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
 					}
@@ -289,10 +290,7 @@ func (m *Manager) Shutdown() {
 // Started returns true if shutdown has been started.
 // Note that shutdown can have been started before you check the value.
 func (m *Manager) Started() bool {
-	m.srM.RLock()
-	started := m.shutdownRequested
-	m.srM.RUnlock()
-	return started
+	return m.shutdownRequested.Load()
 }
 
 // StartedCh returns a channel that is closed once shutdown has started.
@@ -328,12 +326,9 @@ func (m *Manager) Wait() {
 // For easier debugging you can send a context that will be printed if the lock
 // times out. All supplied context is printed with '%v' formatting.
 func (m *Manager) Lock(ctx ...interface{}) func() {
-	m.srM.RLock()
-	if m.shutdownRequested {
-		m.srM.RUnlock()
+	if m.shutdownRequested.Load() {
 		return nil
 	}
-	m.srM.RUnlock()
 
 	m.wg.Add(1)
 
