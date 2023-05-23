@@ -1,7 +1,4 @@
-// Copyright (c) 2015 Klaus Post, released under MIT License. See LICENSE file.
-
-//go:build go1.7
-// +build go1.7
+// Copyright (c) 2015 Klaus Post, 2023 Eik Madsen, released under MIT License. See LICENSE file.
 
 package shutdown
 

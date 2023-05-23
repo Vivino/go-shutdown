@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -17,7 +18,11 @@ import (
 	"os"
 	"syscall"
 
-	shutdown "github.com/klauspost/shutdown2"
+	shutdownp "github.com/eikmadsen/shutdown"
+)
+
+var (
+	shutdown = shutdownp.New()
 )
 
 func main() {
@@ -52,7 +57,7 @@ func logger() {
 	exit := shutdown.Third()
 	for {
 		select {
-		case v := <-exit:
+		case v := <-exit.Notify():
 			log.Println("Flushing log...")
 			finished := false
 			for !finished {

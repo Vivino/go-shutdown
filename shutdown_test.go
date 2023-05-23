@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Klaus Post, released under MIT License. See LICENSE file.
+// Copyright (c) 2015 Klaus Post, 2023 Eik Madsen, released under MIT License. See LICENSE file.
 
 package shutdown
 
@@ -99,9 +99,9 @@ func TestPreShutdown(t *testing.T) {
 	}()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second {
-		t.Fatalf("timeout time was hit unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was hit unexpected:%v", time.Since(tn))
 	}
 
 	if !ok {
@@ -501,9 +501,9 @@ func TestTimeout(t *testing.T) {
 	}()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*50 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	if !m.Started() {
 		t.Fatal("got unexpected shutdown signal")
@@ -523,9 +523,9 @@ func TestTimeoutN(t *testing.T) {
 	}()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*50 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	if !m.Started() {
 		t.Fatal("got unexpected shutdown signal")
@@ -553,7 +553,7 @@ func TestTimeoutCallback(t *testing.T) {
 	}()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*50 {
 		t.Errorf("timeout time was unexpected:%v (%v->%v)", dur, tn, time.Now())
 	}
@@ -581,9 +581,9 @@ func TestTimeoutN2(t *testing.T) {
 	}()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*50 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	if !m.Started() {
 		t.Fatal("got unexpected shutdown signal")
@@ -647,9 +647,9 @@ func TestLockUnrelease(t *testing.T) {
 	defer got()
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*50 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	if !m.Started() {
 		t.Fatal("expected that shutdown had started")
@@ -677,7 +677,7 @@ func TestLockCallback(t *testing.T) {
 		t.Fatal("Unable to aquire lock")
 	}
 	wg.Wait()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Second || dur < time.Millisecond*30 {
 		t.Errorf("timeout time was unexpected:%v (%v->%v)", dur, tn, time.Now())
 	}

@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Klaus Post, released under MIT License. See LICENSE file.
+// Copyright (c) 2015 Klaus Post, 2023 Eik Madsen, released under MIT License. See LICENSE file.
 
 package shutdown
 
@@ -150,9 +150,9 @@ func TestWrapHandlerPanic(t *testing.T) {
 	// There should be no locks held, so it should finish immediately
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Millisecond*500 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 }
 
@@ -178,9 +178,9 @@ func TestWrapHandlerFuncPanic(t *testing.T) {
 	// There should be no locks held, so it should finish immediately
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Millisecond*100 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 }
 
@@ -225,9 +225,9 @@ func TestWrapHandlerOrder(t *testing.T) {
 	<-waiting
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Millisecond*400 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	close(completed)
 	// We should make sure the release has run before exiting
@@ -282,9 +282,9 @@ func TestWrapHandlerFuncOrder(t *testing.T) {
 	<-waiting
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Now().Sub(tn)
+	dur := time.Since(tn)
 	if dur > time.Millisecond*400 {
-		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
+		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	close(completed)
 	// We should make sure the release has run before exiting
