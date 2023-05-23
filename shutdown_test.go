@@ -59,7 +59,7 @@ func startTimer(m *Manager, t *testing.T) chan struct{} {
 }
 
 func TestBasic(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -84,7 +84,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestPreShutdown(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.PreShutdown()
 	ok := false
@@ -113,7 +113,7 @@ func TestPreShutdown(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -132,7 +132,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestCancel2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f2 := m.First()
 	f := m.First()
@@ -163,7 +163,7 @@ func TestCancel2(t *testing.T) {
 }
 
 func TestCancelWait(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -182,7 +182,7 @@ func TestCancelWait(t *testing.T) {
 }
 
 func TestCancelWait2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f2 := m.First()
 	f := m.First()
@@ -215,7 +215,7 @@ func TestCancelWait2(t *testing.T) {
 // TestCancelWait3 assert that we can CancelWait, and that wait will wait until the
 // specified stage.
 func TestCancelWait3(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2, ok3 bool
@@ -270,7 +270,7 @@ func TestCancelWait3(t *testing.T) {
 // TestCancelWait4 assert that we can CancelWait on a previous stage,
 // and it doesn't block.
 func TestCancelWait4(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.Second()
 	var ok bool
@@ -304,7 +304,7 @@ func (l *logBuffer) WriteF(format string, a ...interface{}) {
 
 // TestContextLog assert that context is logged as expected.
 func TestContextLog(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	m.SetTimeout(10 * time.Millisecond)
 	var buf = &logBuffer{fn: t.Logf}
@@ -338,7 +338,7 @@ func TestContextLog(t *testing.T) {
 }
 
 func TestFnCancelWait(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2 bool
@@ -371,7 +371,7 @@ func TestFnCancelWait(t *testing.T) {
 }
 
 func TestNilNotifier(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -395,7 +395,7 @@ func TestNilNotifier(t *testing.T) {
 }
 
 func TestNilNotifierCancel(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -418,7 +418,7 @@ func TestNilNotifierCancel(t *testing.T) {
 }
 
 func TestNilNotifierCancelWait(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -441,7 +441,7 @@ func TestNilNotifierCancelWait(t *testing.T) {
 }
 
 func TestNilNotifierFollowing(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -467,7 +467,7 @@ func TestNilNotifierFollowing(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	ok := make(chan bool)
 	go func() {
@@ -490,7 +490,7 @@ func TestWait(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	defer close(startTimer(m, t))
 	f := m.First()
@@ -511,7 +511,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestTimeoutN(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second * 2)
 	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
 	defer close(startTimer(m, t))
@@ -533,7 +533,7 @@ func TestTimeoutN(t *testing.T) {
 }
 
 func TestTimeoutCallback(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second * 2)
 	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
 	defer close(startTimer(m, t))
@@ -569,7 +569,7 @@ func TestTimeoutCallback(t *testing.T) {
 }
 
 func TestTimeoutN2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Millisecond * 100)
 	m.SetTimeoutN(m.Stage2, time.Second*2)
 	defer close(startTimer(m, t))
@@ -591,7 +591,7 @@ func TestTimeoutN2(t *testing.T) {
 }
 
 func TestLock(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -636,7 +636,7 @@ func TestLock(t *testing.T) {
 }
 
 func TestLockUnrelease(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	m.SetTimeout(time.Millisecond * 500)
 	m.SetTimeoutN(m.StagePS, time.Millisecond*100)
@@ -657,7 +657,7 @@ func TestLockUnrelease(t *testing.T) {
 }
 
 func TestLockCallback(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	m.SetTimeout(time.Millisecond * 50)
 	const testctx = "lock context"
@@ -690,7 +690,7 @@ func TestLockCallback(t *testing.T) {
 }
 
 func TestOrder(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	t3 := m.Third()
@@ -757,7 +757,7 @@ func TestOrder(t *testing.T) {
 }
 
 func TestRecursive(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	if m.Started() {
@@ -803,7 +803,7 @@ func TestRecursive(t *testing.T) {
 }
 
 func TestBasicFn(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -826,7 +826,7 @@ func setBool(i *bool) func() {
 }
 
 func TestFnOrder(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -857,7 +857,7 @@ func TestFnOrder(t *testing.T) {
 }
 
 func TestFnRecursive(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -889,7 +889,7 @@ func TestFnRecursive(t *testing.T) {
 
 // When setting First or Second inside stage three they should be ignored.
 func TestFnRecursiveRev(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -920,7 +920,7 @@ func TestFnRecursiveRev(t *testing.T) {
 }
 
 func TestFnCancel(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
 
@@ -951,7 +951,7 @@ func TestFnCancel(t *testing.T) {
 }
 
 func TestFnCancelWait2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
 
@@ -982,7 +982,7 @@ func TestFnCancelWait2(t *testing.T) {
 }
 
 func TestFnPanic(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -1000,7 +1000,7 @@ func TestFnPanic(t *testing.T) {
 }
 
 func TestFnNotify(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -1037,7 +1037,7 @@ func TestStatusTimerFn(t *testing.T) {
 			}
 		}
 	}
-	m := NewManager()
+	m := New()
 	m.FirstFn(func() {
 		time.Sleep(time.Millisecond * 100)
 	})
@@ -1066,7 +1066,7 @@ func TestStatusTimerFn(t *testing.T) {
 }
 
 func TestStatusTimer(t *testing.T) {
-	m := NewManager()
+	m := New()
 	fn := m.First()
 	_, file, line, _ := runtime.Caller(0)
 	want := fmt.Sprintf("%s:%d", file, line-1)
@@ -1101,7 +1101,7 @@ func TestStatusTimer(t *testing.T) {
 }
 
 func TestFnSingleCancel(t *testing.T) {
-	m := NewManager()
+	m := New()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3, okcancel bool
@@ -1147,7 +1147,7 @@ func TestFnSingleCancel(t *testing.T) {
 }
 
 func TestCancelMulti(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
@@ -1182,7 +1182,7 @@ func TestCancelMulti(t *testing.T) {
 }
 
 func TestCancelMulti2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
@@ -1236,7 +1236,7 @@ func TestCancelMulti2(t *testing.T) {
 }
 
 func TestCancelWaitMulti(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
@@ -1271,7 +1271,7 @@ func TestCancelWaitMulti(t *testing.T) {
 }
 
 func TestCancelWaitMulti2(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
@@ -1400,7 +1400,7 @@ func ExampleWait() {
 	}
 
 	// ignore this reset, for test purposes only
-	m := NewManager()
+	m := New()
 
 	// Wait for the jobs above to finish
 	go func() {

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// NewManager returns an initialized manager
-func NewManager() *Manager {
+// New returns an initialized shutdown manager
+func New() *Manager {
 	m := &Manager{
 		Logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
 		StagePS:             Stage{0},

@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -9,7 +10,7 @@ import (
 	"os"
 	"syscall"
 
-	shutdown "github.com/klauspost/shutdown2"
+	"github.com/eikmadsen/shutdown"
 )
 
 // This example shows a server that has logging to a file
@@ -30,21 +31,22 @@ func closeFile(f *os.File) func() {
 }
 
 func main() {
+	m := shutdown.New()
 	// Make shutdown catch Ctrl+c and system terminate
-	shutdown.OnSignal(0, os.Interrupt, syscall.SIGTERM)
+	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
 
 	// Create a log file
 	var logFile *os.File
 	logFile, _ = os.Create("log.txt")
 
 	// When shutdown is initiated, close the file
-	shutdown.FirstFn(closeFile(logFile))
+	m.FirstFn(closeFile(logFile))
 
 	// Start a webserver
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		// Get a lock, and write to the file if we get it.
 		// While we have the lock the file will not be closed.
-		l := shutdown.Lock()
+		l := m.Lock()
 		if l != nil {
 			_, _ = logFile.WriteString(req.URL.String() + "\n")
 			l()

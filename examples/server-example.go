@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -11,7 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	shutdown "github.com/klauspost/shutdown2"
+	shutdownp "github.com/eikmadsen/shutdown"
+)
+
+var (
+	shutdown = shutdownp.New()
 )
 
 // This example shows a server that has message processing in a separate goroutine
@@ -91,7 +96,7 @@ func dataLoop() {
 			} else {
 				reply <- "unknown command\n"
 			}
-		case n := <-end:
+		case n := <-end.Notify():
 			log.Println("Exiting data loop")
 			close(request)
 			close(reply)

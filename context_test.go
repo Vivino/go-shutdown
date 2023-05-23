@@ -20,7 +20,7 @@ type otherContext struct {
 }
 
 func TestCancelCtx(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 
@@ -67,7 +67,7 @@ func TestCancelCtx(t *testing.T) {
 }
 
 func TestCancelCtxN(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
@@ -116,7 +116,7 @@ func TestCancelCtxN(t *testing.T) {
 }
 
 func TestCancelCtxNShutdown(t *testing.T) {
-	m := NewManager()
+	m := New()
 	m.SetTimeout(time.Second)
 	defer close(startTimer(m, t))
 	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
