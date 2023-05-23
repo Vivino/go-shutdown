@@ -10,9 +10,9 @@ import (
 // That will lock shutdown until all have completed
 // and will return http.StatusServiceUnavailable if
 // shutdown has been initiated.
-func WrapHandler(h http.Handler) http.Handler {
+func (m *Manager) WrapHandler(h http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		l := Lock()
+		l := m.Lock()
 		if l == nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
@@ -28,9 +28,9 @@ func WrapHandler(h http.Handler) http.Handler {
 // that will lock shutdown until all have completed.
 // The handler will return http.StatusServiceUnavailable if
 // shutdown has been initiated.
-func WrapHandlerFunc(h http.HandlerFunc) http.HandlerFunc {
+func (m *Manager) WrapHandlerFunc(h http.HandlerFunc) http.HandlerFunc {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		l := Lock()
+		l := m.Lock()
 		if l == nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return

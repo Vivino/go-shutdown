@@ -66,7 +66,7 @@ Next you can register functions to run when shutdown runs:
   })
 
   // Execute this function in the second part of the shutdown process
-  _ = shutdown.SecondFn(func(){
+  _ = m.SecondFn(func(){
     _ = os.Delete("log.txt")
   })
 ```
@@ -82,7 +82,7 @@ This allows you do have shutdown handling in blocked select statements like this
 ```Go
   go func() {
     // Get a stage 1 notification
-    finish := shutdown.First()
+    finish := shutdown.m.First()
     select {
       case n:= <-finish:
         log.Println("Closing")
@@ -96,7 +96,7 @@ for, `nil` will be returned.
 
 ```Go
     // Get a stage 1 notification
-    finish := shutdown.First()
+    finish := shutdown.m.First()
     // If shutdown is at Stage 1 or later, nil will be returned 
     if finish == nil {
         log.Println("Already shutting down")
@@ -116,7 +116,7 @@ and the shutdown code will no longer wait for it on exit.
 ```Go
   go func() {
     // Get a stage 1 notification
-    finish := shutdown.First()
+    finish := shutdown.m.First()
     select {
       case n:= <-finish:
         close(n)
@@ -137,7 +137,7 @@ If you get back a nil notifier because shutdown has already reached that stage, 
 ```Go
   go func() {
     // Get a stage 1 notification
-    finish := shutdown.First()    
+    finish := shutdown.m.First()    
     if finish == nil {
         return 
     }
@@ -186,7 +186,7 @@ where it takes longer to complete than the allowed time, or you have forgotten t
 
 Finally you can call `shutdown.Exit(exitcode)` to call all exit handlers and exit your application. 
 This will wait for all locks to be released and notify all shutdown handlers and exit with the given exit code. 
-If you want to do the exit yourself you can call the `shutdown.Shutdown()`, which does the same, but doesn't exit. 
+If you want to do the exit yourself you can call the `shutdown.m.Shutdown()`, which does the same, but doesn't exit. 
 Beware that you don't hold a lock when you call Exit/Shutdown.
 
 Do note that calling `os.Exit()` or unhandled panics **does not execute your shutdown handlers**. 
@@ -198,7 +198,7 @@ Also there are some things to be mindful of:
 * If a panic occurs inside a shutdown function call in your code, the panic will be recovered and **ignored** and the shutdown will proceed. A message along with the backtrace is printed to `Logger`. If you want to handle panics, you must do it in your code.
 * When shutdown is initiated, it cannot be stopped.
 
-When you design with this do take care that this library is for **controlled** shutdown of your application. If you application crashes no shutdown handlers are run, so panics will still be fatal. You can of course still call the `Shutdown()` function if you recover a panic, but the library does nothing like this automatically.
+When you design with this do take care that this library is for **controlled** shutdown of your application. If you application crashes no shutdown handlers are run, so panics will still be fatal. You can of course still call the `m.Shutdown()` function if you recover a panic, but the library does nothing like this automatically.
 
 #### nil notifiers
 
@@ -210,7 +210,7 @@ reached the stage you are requesting a notifier for.
 This is backwards compatible, but makes it much easier to test for such a case:
  
 ```Go
-    f := shutdown.First()
+    f := shutdown.m.First()
     if f == nil {
         // Already shutting down.
         return

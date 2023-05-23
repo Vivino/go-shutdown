@@ -14,18 +14,22 @@ import (
 	"time"
 )
 
+var (
+	m = NewManager()
+)
+
 // This example creates a custom function handler
 // and wraps the handler, so all request will
 // finish before shutdown is started.
 //
 // If requests take too long to finish (see the shutdown will proceed
 // and clients will be disconnected when the server shuts down.
-// To modify the timeout use SetTimeoutN(Preshutdown, duration)
+// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
 func ExampleWrapHandlerFunc() {
 	// Set a custom timeout, if the 5 second default doesn't fit your needs.
-	SetTimeoutN(StagePS, time.Second*30)
+	m.SetTimeoutN(m.StagePS, time.Second*30)
 	// Catch OS signals
-	OnSignal(0, os.Interrupt, syscall.SIGTERM)
+	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
 
 	// Example handler function
 	fn := func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +37,7 @@ func ExampleWrapHandlerFunc() {
 	}
 
 	// Wrap the handler function
-	http.HandleFunc("/", WrapHandlerFunc(fn))
+	http.HandleFunc("/", m.WrapHandlerFunc(fn))
 
 	// Start the server
 	http.ListenAndServe(":8080", nil)
@@ -45,32 +49,32 @@ func ExampleWrapHandlerFunc() {
 //
 // If requests take too long to finish the shutdown will proceed
 // and clients will be disconnected when the server shuts down.
-// To modify the timeout use SetTimeoutN(Preshutdown, duration)
+// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
 func ExampleWrapHandler() {
 	// Set a custom timeout, if the 5 second default doesn't fit your needs.
-	SetTimeoutN(StagePS, time.Second*30)
+	m.SetTimeoutN(m.StagePS, time.Second*30)
 	// Catch OS signals
-	OnSignal(0, os.Interrupt, syscall.SIGTERM)
+	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
 
 	// Create a fileserver handler
 	fh := http.FileServer(http.Dir("/examples"))
 
 	// Wrap the handler function
-	http.Handle("/", WrapHandler(fh))
+	http.Handle("/", m.WrapHandler(fh))
 
 	// Start the server
 	http.ListenAndServe(":8080", nil)
 }
 
 func TestWrapHandlerBasic(t *testing.T) {
-	reset()
-	defer close(startTimer(t))
+	m := NewManager()
+	defer close(startTimer(m, t))
 	var finished = false
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		finished = true
 	})
 
-	wrapped := WrapHandler(fn)
+	wrapped := m.WrapHandler(fn)
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("", "", bytes.NewBufferString(""))
 	wrapped.ServeHTTP(res, req)
@@ -81,7 +85,7 @@ func TestWrapHandlerBasic(t *testing.T) {
 		t.Fatal("Handler was not executed")
 	}
 
-	Shutdown()
+	m.Shutdown()
 	finished = false
 	res = httptest.NewRecorder()
 	wrapped.ServeHTTP(res, req)
@@ -94,14 +98,14 @@ func TestWrapHandlerBasic(t *testing.T) {
 }
 
 func TestWrapHandlerFuncBasic(t *testing.T) {
-	reset()
-	defer close(startTimer(t))
+	m := NewManager()
+	defer close(startTimer(m, t))
 	var finished = false
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		finished = true
 	})
 
-	wrapped := WrapHandlerFunc(fn)
+	wrapped := m.WrapHandlerFunc(fn)
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("", "", bytes.NewBufferString(""))
 	wrapped(res, req)
@@ -112,7 +116,7 @@ func TestWrapHandlerFuncBasic(t *testing.T) {
 		t.Fatal("Handler was not executed")
 	}
 
-	Shutdown()
+	m.Shutdown()
 	finished = false
 	res = httptest.NewRecorder()
 	wrapped(res, req)
@@ -126,14 +130,14 @@ func TestWrapHandlerFuncBasic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerPanic(t *testing.T) {
-	reset()
-	SetTimeout(time.Second)
-	defer close(startTimer(t))
+	m := NewManager()
+	m.SetTimeout(time.Second)
+	defer close(startTimer(m, t))
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
 	})
 
-	wrapped := WrapHandler(fn)
+	wrapped := m.WrapHandler(fn)
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("", "", bytes.NewBufferString(""))
 	func() {
@@ -145,7 +149,7 @@ func TestWrapHandlerPanic(t *testing.T) {
 
 	// There should be no locks held, so it should finish immediately
 	tn := time.Now()
-	Shutdown()
+	m.Shutdown()
 	dur := time.Now().Sub(tn)
 	if dur > time.Millisecond*500 {
 		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
@@ -154,14 +158,14 @@ func TestWrapHandlerPanic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerFuncPanic(t *testing.T) {
-	reset()
-	SetTimeout(time.Millisecond * 200)
-	defer close(startTimer(t))
+	m := NewManager()
+	m.SetTimeout(time.Millisecond * 200)
+	defer close(startTimer(m, t))
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
 	})
 
-	wrapped := WrapHandlerFunc(fn)
+	wrapped := m.WrapHandlerFunc(fn)
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("", "", bytes.NewBufferString(""))
 	func() {
@@ -173,7 +177,7 @@ func TestWrapHandlerFuncPanic(t *testing.T) {
 
 	// There should be no locks held, so it should finish immediately
 	tn := time.Now()
-	Shutdown()
+	m.Shutdown()
 	dur := time.Now().Sub(tn)
 	if dur > time.Millisecond*100 {
 		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
@@ -182,8 +186,8 @@ func TestWrapHandlerFuncPanic(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerOrder(t *testing.T) {
-	reset()
-	defer close(startTimer(t))
+	m := NewManager()
+	defer close(startTimer(m, t))
 	var finished = make(chan bool)
 	var wait = make(chan bool)
 	var waiting = make(chan bool)
@@ -192,7 +196,7 @@ func TestWrapHandlerOrder(t *testing.T) {
 		<-wait
 	})
 
-	wrapped := WrapHandler(fn)
+	wrapped := m.WrapHandler(fn)
 
 	go func() {
 		res := httptest.NewRecorder()
@@ -220,7 +224,7 @@ func TestWrapHandlerOrder(t *testing.T) {
 	}()
 	<-waiting
 	tn := time.Now()
-	Shutdown()
+	m.Shutdown()
 	dur := time.Now().Sub(tn)
 	if dur > time.Millisecond*400 {
 		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))
@@ -239,8 +243,8 @@ func TestWrapHandlerOrder(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerFuncOrder(t *testing.T) {
-	reset()
-	defer close(startTimer(t))
+	m := NewManager()
+	defer close(startTimer(m, t))
 	var finished = make(chan bool)
 	var wait = make(chan bool)
 	var waiting = make(chan bool)
@@ -250,7 +254,7 @@ func TestWrapHandlerFuncOrder(t *testing.T) {
 		<-wait
 	})
 
-	wrapped := WrapHandlerFunc(fn)
+	wrapped := m.WrapHandlerFunc(fn)
 
 	go func() {
 		res := httptest.NewRecorder()
@@ -277,7 +281,7 @@ func TestWrapHandlerFuncOrder(t *testing.T) {
 	}()
 	<-waiting
 	tn := time.Now()
-	Shutdown()
+	m.Shutdown()
 	dur := time.Now().Sub(tn)
 	if dur > time.Millisecond*400 {
 		t.Fatalf("timeout time was unexpected:%v", time.Now().Sub(tn))

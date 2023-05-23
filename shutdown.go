@@ -4,14 +4,13 @@
 //
 // The package will enable you to get notifications for your application and handle the shutdown process.
 //
-// See more information about the how to use it in the README.md file
+// # See more information about the how to use it in the README.md file
 //
 // Package home: https://github.com/klauspost/shutdown2
 package shutdown
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -32,60 +31,23 @@ type LogPrinter interface {
 	Printf(format string, v ...interface{})
 }
 
-var (
-	// Logger used for output.
-	// This can be exchanged with your own.
-	Logger = LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags))
-
-	// LoggerMu is a mutex for the Logger
-	LoggerMu sync.Mutex
-
-	// StagePS indicates the pre shutdown stage when waiting for locks to be released.
-	StagePS = Stage{0}
-
-	// Stage1 Indicates first stage of timeouts.
-	Stage1 = Stage{1}
-
-	// Stage2 Indicates second stage of timeouts.
-	Stage2 = Stage{2}
-
-	// Stage3 indicates third stage of timeouts.
-	Stage3 = Stage{3}
-
-	// WarningPrefix is printed before warnings.
-	WarningPrefix = "WARN: "
-
-	// ErrorPrefix is printed before errors.
-	ErrorPrefix = "ERROR: "
-
-	// LogLockTimeouts enables log timeout warnings
-	// and notifier status updates.
-	// Should not be changed once shutdown has started.
-	LogLockTimeouts = true
-
-	// StatusTimer is the time between logging which notifiers are waiting to finish.
-	// Should not be changed once shutdown has started.
-	StatusTimer = time.Minute
-
-	sqM              sync.Mutex // Mutex for below
-	shutdownQueue    [4][]iNotifier
-	shutdownFnQueue  [4][]fnNotify
-	shutdownFinished = make(chan struct{}, 0) // Closed when shutdown has finished
-	currentStage     = Stage{-1}
-
-	srM                 sync.RWMutex // Mutex for below
-	shutdownRequested   = false
-	shutdownRequestedCh = make(chan struct{})
-	timeouts            = [4]time.Duration{5 * time.Second, 5 * time.Second, 5 * time.Second, 5 * time.Second}
-
-	onTimeOut func(s Stage, ctx string)
-	wg        = &sync.WaitGroup{}
-)
-
 // Notifier is a channel, that will be sent a channel
 // once the application shuts down.
 // When you have performed your shutdown actions close the channel you are given.
-type Notifier chan chan struct{}
+type Notifier struct {
+	c chan chan struct{}
+	m *Manager
+}
+
+// Valid returns true if it can be used as a notifier. If false shutdown has already started
+func (n Notifier) Valid() bool {
+	return n.m != nil
+}
+
+// Notify returns a channel to listen to for shutdown events
+func (n Notifier) Notify() <-chan chan struct{} {
+	return n.c
+}
 
 // Internal notifier
 type iNotifier struct {
@@ -107,37 +69,37 @@ func (l logWrapper) Printf(format string, v ...interface{}) {
 }
 
 // SetLogPrinter will use the specified function to write logging information.
-func SetLogPrinter(fn func(format string, v ...interface{})) {
-	LoggerMu.Lock()
-	Logger = logWrapper{w: fn}
-	LoggerMu.Unlock()
+func (m *Manager) SetLogPrinter(fn func(format string, v ...interface{})) {
+	m.LoggerMu.Lock()
+	m.Logger = logWrapper{w: fn}
+	m.LoggerMu.Unlock()
 }
 
 // OnTimeout allows you to get a notification if a shutdown stage times out.
 // The stage and the context of the hanging shutdown/lock function is returned.
-func OnTimeout(fn func(Stage, string)) {
-	srM.Lock()
-	onTimeOut = fn
-	srM.Unlock()
+func (m *Manager) OnTimeout(fn func(Stage, string)) {
+	m.srM.Lock()
+	m.onTimeOut = fn
+	m.srM.Unlock()
 }
 
 // SetTimeout sets maximum delay to wait for each stage to finish.
 // When the timeout has expired for a stage the next stage will be initiated.
-func SetTimeout(d time.Duration) {
-	srM.Lock()
-	for i := range timeouts {
-		timeouts[i] = d
+func (m *Manager) SetTimeout(d time.Duration) {
+	m.srM.Lock()
+	for i := range m.timeouts {
+		m.timeouts[i] = d
 	}
-	srM.Unlock()
+	m.srM.Unlock()
 }
 
 // SetTimeoutN set maximum delay to wait for a specific stage to finish.
 // When the timeout expired for a stage the next stage will be initiated.
 // The stage can be obtained by using the exported variables called 'Stage1, etc.
-func SetTimeoutN(s Stage, d time.Duration) {
-	srM.Lock()
-	timeouts[s.n] = d
-	srM.Unlock()
+func (m *Manager) SetTimeoutN(s Stage, d time.Duration) {
+	m.srM.Lock()
+	m.timeouts[s.n] = d
+	m.srM.Unlock()
 }
 
 // Cancel a Notifier.
@@ -146,52 +108,52 @@ func SetTimeoutN(s Stage, d time.Duration) {
 // If the shutdown has already started this will not have any effect,
 // but a goroutine will wait for the notifier to be triggered.
 func (s Notifier) Cancel() {
-	if s == nil {
+	if s.c == nil {
 		return
 	}
-	srM.RLock()
-	if shutdownRequested {
-		srM.RUnlock()
+	s.m.srM.RLock()
+	if s.m.shutdownRequested {
+		s.m.srM.RUnlock()
 		// Wait until we get the notification and close it:
 		go func() {
 			select {
-			case v := <-s:
+			case v := <-s.c:
 				close(v)
 			}
 		}()
 		return
 	}
-	srM.RUnlock()
-	sqM.Lock()
+	s.m.srM.RUnlock()
+	s.m.sqM.Lock()
 	var a chan chan struct{}
 	var b chan chan struct{}
-	a = s
-	for n, sdq := range shutdownQueue {
+	a = s.c
+	for n, sdq := range s.m.shutdownQueue {
 		for i, qi := range sdq {
-			b = qi.n
+			b = qi.n.c
 			if a == b {
-				shutdownQueue[n] = append(shutdownQueue[n][:i], shutdownQueue[n][i+1:]...)
+				s.m.shutdownQueue[n] = append(s.m.shutdownQueue[n][:i], s.m.shutdownQueue[n][i+1:]...)
 			}
 		}
-		for i, fn := range shutdownFnQueue[n] {
-			b = fn.client
+		for i, fn := range s.m.shutdownFnQueue[n] {
+			b = fn.client.c
 			if a == b {
 				// Find the matching internal and remove that.
-				for i := range shutdownQueue[n] {
-					b = shutdownQueue[n][i].n
-					if fn.internal.n == b {
-						shutdownQueue[n] = append(shutdownQueue[n][:i], shutdownQueue[n][i+1:]...)
+				for i := range s.m.shutdownQueue[n] {
+					b = s.m.shutdownQueue[n][i].n.c
+					if fn.internal.n.c == b {
+						s.m.shutdownQueue[n] = append(s.m.shutdownQueue[n][:i], s.m.shutdownQueue[n][i+1:]...)
 						break
 					}
 				}
 				// Cancel, so the goroutine exits.
 				close(fn.cancel)
 				// Remove this
-				shutdownFnQueue[n] = append(shutdownFnQueue[n][:i], shutdownFnQueue[n][i+1:]...)
+				s.m.shutdownFnQueue[n] = append(s.m.shutdownFnQueue[n][:i], s.m.shutdownFnQueue[n][i+1:]...)
 			}
 		}
 	}
-	sqM.Unlock()
+	s.m.sqM.Unlock()
 }
 
 // CancelWait will cancel a Notifier, or wait for it to become active if shutdown has been started.
@@ -199,134 +161,138 @@ func (s Notifier) Cancel() {
 // If the notifier is nil (requested after its stage has started), it will return at once.
 // If the shutdown has already started, this will wait for the notifier to be called and close it.
 func (s Notifier) CancelWait() {
-	if s == nil {
+	if s.c == nil {
 		return
 	}
-	sqM.Lock()
+	s.m.sqM.Lock()
 	var a chan chan struct{}
 	var b chan chan struct{}
-	a = s
-	for n, sdq := range shutdownQueue {
+	a = s.c
+	for n, sdq := range s.m.shutdownQueue {
 		for i, qi := range sdq {
-			b = qi.n
+			b = qi.n.c
 			if a == b {
-				shutdownQueue[n] = append(shutdownQueue[n][:i], shutdownQueue[n][i+1:]...)
+				s.m.shutdownQueue[n] = append(s.m.shutdownQueue[n][:i], s.m.shutdownQueue[n][i+1:]...)
 			}
 		}
-		for i, fn := range shutdownFnQueue[n] {
-			b = fn.client
+		for i, fn := range s.m.shutdownFnQueue[n] {
+			b = fn.client.c
 			if a == b {
 				// Find the matching internal and remove that.
-				for i := range shutdownQueue[n] {
-					b = shutdownQueue[n][i].n
-					if fn.internal.n == b {
-						shutdownQueue[n] = append(shutdownQueue[n][:i], shutdownQueue[n][i+1:]...)
+				for i := range s.m.shutdownQueue[n] {
+					b = s.m.shutdownQueue[n][i].n.c
+					if fn.internal.n.c == b {
+						s.m.shutdownQueue[n] = append(s.m.shutdownQueue[n][:i], s.m.shutdownQueue[n][i+1:]...)
 						break
 					}
 				}
 				// Cancel, so the goroutine exits.
 				close(fn.cancel)
 				// Remove this
-				shutdownFnQueue[n] = append(shutdownFnQueue[n][:i], shutdownFnQueue[n][i+1:]...)
+				s.m.shutdownFnQueue[n] = append(s.m.shutdownFnQueue[n][:i], s.m.shutdownFnQueue[n][i+1:]...)
 			}
 		}
 	}
-	srM.RLock()
-	if shutdownRequested {
-		sqM.Unlock()
-		srM.RUnlock()
+	s.m.srM.RLock()
+	if s.m.shutdownRequested {
+		s.m.sqM.Unlock()
+		s.m.srM.RUnlock()
 		// Wait until we get the notification and close it:
 		select {
-		case v := <-s:
+		case v := <-s.c:
 			close(v)
 		}
 		return
 	}
-	srM.RUnlock()
-	sqM.Unlock()
+	s.m.srM.RUnlock()
+	s.m.sqM.Unlock()
 }
 
 // PreShutdown will return a Notifier that will be fired as soon as the shutdown.
 // is signalled, before locks are released.
 // This allows to for instance send signals to upstream servers not to send more requests.
 // The context is printed if LogLockTimeouts is enabled.
-func PreShutdown(ctx ...interface{}) Notifier {
-	return onShutdown(0, 1, ctx).n
+func (m *Manager) PreShutdown(ctx ...interface{}) Notifier {
+	return m.onShutdown(0, 1, ctx).n
 }
 
 // PreShutdownFn registers a function that will be called as soon as the shutdown.
 // is signalled, before locks are released.
 // This allows to for instance send signals to upstream servers not to send more requests.
 // The context is printed if LogLockTimeouts is enabled.
-func PreShutdownFn(fn func(), ctx ...interface{}) Notifier {
-	return onFunc(0, 1, fn, ctx)
+func (m *Manager) PreShutdownFn(fn func(), ctx ...interface{}) Notifier {
+	return m.onFunc(0, 1, fn, ctx)
 }
 
 // First returns a notifier that will be called in the first stage of shutdowns.
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func First(ctx ...interface{}) Notifier {
-	return onShutdown(1, 1, ctx).n
+func (m *Manager) First(ctx ...interface{}) Notifier {
+	return m.onShutdown(1, 1, ctx).n
 }
 
 // FirstFn executes a function in the first stage of the shutdown
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func FirstFn(fn func(), ctx ...interface{}) Notifier {
-	return onFunc(1, 1, fn, ctx)
+func (m *Manager) FirstFn(fn func(), ctx ...interface{}) Notifier {
+	return m.onFunc(1, 1, fn, ctx)
 }
 
 // Second returns a notifier that will be called in the second stage of shutdowns.
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func Second(ctx ...interface{}) Notifier {
-	return onShutdown(2, 1, ctx).n
+func (m *Manager) Second(ctx ...interface{}) Notifier {
+	return m.onShutdown(2, 1, ctx).n
 }
 
 // SecondFn executes a function in the second stage of the shutdown.
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func SecondFn(fn func(), ctx ...interface{}) Notifier {
-	return onFunc(2, 1, fn, ctx)
+func (m *Manager) SecondFn(fn func(), ctx ...interface{}) Notifier {
+	return m.onFunc(2, 1, fn, ctx)
 }
 
 // Third returns a notifier that will be called in the third stage of shutdowns.
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func Third(ctx ...interface{}) Notifier {
-	return onShutdown(3, 1, ctx).n
+func (m *Manager) Third(ctx ...interface{}) Notifier {
+	return m.onShutdown(3, 1, ctx).n
 }
 
 // ThirdFn executes a function in the third stage of the shutdown.
 // If shutdown has started and this stage has already been reached, nil will be returned.
 // The context is printed if LogLockTimeouts is enabled.
-func ThirdFn(fn func(), ctx ...interface{}) Notifier {
-	return onFunc(3, 1, fn, ctx)
+func (m *Manager) ThirdFn(fn func(), ctx ...interface{}) Notifier {
+	return m.onFunc(3, 1, fn, ctx)
+}
+
+func (m *Manager) newNotifier() Notifier {
+	return Notifier{c: make(chan chan struct{}, 1), m: m}
 }
 
 // Create a function notifier.
 // depth is the call depth of the caller.
-func onFunc(prio, depth int, fn func(), ctx []interface{}) Notifier {
+func (m *Manager) onFunc(prio, depth int, fn func(), ctx []interface{}) Notifier {
 	f := fnNotify{
-		internal: onShutdown(prio, depth+1, ctx),
+		internal: m.onShutdown(prio, depth+1, ctx),
 		cancel:   make(chan struct{}),
-		client:   make(Notifier, 1),
+		client:   m.newNotifier(),
 	}
-	if f.internal.n == nil {
-		return nil
+	if f.internal.n.c == nil {
+		return Notifier{}
 	}
 	go func() {
 		select {
 		case <-f.cancel:
 			return
-		case c := <-f.internal.n:
+		case c := <-f.internal.n.c:
 			{
 				defer func() {
 					if r := recover(); r != nil {
-						LoggerMu.Lock()
-						Logger.Printf(ErrorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
-						Logger.Printf("%s", string(debug.Stack()))
-						LoggerMu.Unlock()
+						m.LoggerMu.Lock()
+						m.Logger.Printf(m.ErrorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
+						m.Logger.Printf("%s", string(debug.Stack()))
+						m.LoggerMu.Unlock()
 					}
 					if c != nil {
 						close(c)
@@ -336,118 +302,120 @@ func onFunc(prio, depth int, fn func(), ctx []interface{}) Notifier {
 			}
 		}
 	}()
-	sqM.Lock()
-	shutdownFnQueue[prio] = append(shutdownFnQueue[prio], f)
-	sqM.Unlock()
+	m.sqM.Lock()
+	m.shutdownFnQueue[prio] = append(m.shutdownFnQueue[prio], f)
+	m.sqM.Unlock()
 	return f.client
 }
 
 // onShutdown will request a shutdown notifier.
 // depth is the call depth of the caller.
-func onShutdown(prio, depth int, ctx []interface{}) iNotifier {
-	sqM.Lock()
-	if currentStage.n >= prio {
-		sqM.Unlock()
-		return iNotifier{n: nil}
+func (m *Manager) onShutdown(prio, depth int, ctx []interface{}) iNotifier {
+	m.sqM.Lock()
+	if m.currentStage.n >= prio {
+		m.sqM.Unlock()
+		return iNotifier{n: Notifier{}}
 	}
-	n := make(Notifier, 1)
+	n := m.newNotifier()
 	in := iNotifier{n: n}
-	if LogLockTimeouts {
+	if m.LogLockTimeouts {
 		_, file, line, _ := runtime.Caller(depth + 1)
 		in.calledFrom = fmt.Sprintf("%s:%d", file, line)
 		if len(ctx) != 0 {
 			in.calledFrom = fmt.Sprintf("%v - %s", ctx, in.calledFrom)
 		}
 	}
-	shutdownQueue[prio] = append(shutdownQueue[prio], in)
-	sqM.Unlock()
+	m.shutdownQueue[prio] = append(m.shutdownQueue[prio], in)
+	m.sqM.Unlock()
 	return in
 }
 
 // OnSignal will start the shutdown when any of the given signals arrive
 //
 // A good shutdown default is
-//    shutdown.OnSignal(0, os.Interrupt, syscall.SIGTERM)
+//
+//	shutdown.OnSignal(0, os.Interrupt, syscall.SIGTERM)
+//
 // which will do shutdown on Ctrl+C and when the program is terminated.
-func OnSignal(exitCode int, sig ...os.Signal) {
+func (m *Manager) OnSignal(exitCode int, sig ...os.Signal) {
 	// capture signal and shut down.
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, sig...)
 	go func() {
 		for range c {
-			Shutdown()
+			m.Shutdown()
 			os.Exit(exitCode)
 		}
 	}()
 }
 
 // Exit performs shutdown operations and exits with the given exit code.
-func Exit(code int) {
-	Shutdown()
+func (m *Manager) Exit(code int) {
+	m.Shutdown()
 	os.Exit(code)
 }
 
 // Shutdown will signal all notifiers in three stages.
 // It will first check that all locks have been released - see Lock()
-func Shutdown() {
-	srM.Lock()
-	if shutdownRequested {
-		srM.Unlock()
+func (m *Manager) Shutdown() {
+	m.srM.Lock()
+	if m.shutdownRequested {
+		m.srM.Unlock()
 		// Wait till shutdown finished
-		<-shutdownFinished
+		<-m.shutdownFinished
 		return
 	}
-	shutdownRequested = true
-	close(shutdownRequestedCh)
-	lwg := wg
-	onTimeOutFn := onTimeOut
-	srM.Unlock()
+	m.shutdownRequested = true
+	close(m.shutdownRequestedCh)
+	lwg := m.wg
+	onTimeOutFn := m.onTimeOut
+	m.srM.Unlock()
 
 	// Add a pre-shutdown function that waits for all locks to be released.
-	PreShutdownFn(func() {
+	m.PreShutdownFn(func() {
 		lwg.Wait()
 	})
 
-	sqM.Lock()
+	m.sqM.Lock()
 	for stage := 0; stage < 4; stage++ {
-		srM.Lock()
-		to := timeouts[stage]
-		currentStage = Stage{stage}
-		srM.Unlock()
+		m.srM.Lock()
+		to := m.timeouts[stage]
+		m.currentStage = Stage{stage}
+		m.srM.Unlock()
 
-		queue := shutdownQueue[stage]
+		queue := m.shutdownQueue[stage]
 		if len(queue) == 0 {
 			continue
 		}
-		LoggerMu.Lock()
+		m.LoggerMu.Lock()
 		if stage == 0 {
-			Logger.Printf("Initiating shutdown %v", time.Now())
+			m.Logger.Printf("Initiating shutdown %v", time.Now())
 		} else {
-			Logger.Printf("Shutdown stage %v", stage)
+			m.Logger.Printf("Shutdown stage %v", stage)
 		}
-		LoggerMu.Unlock()
+		m.LoggerMu.Unlock()
 		wait := make([]chan struct{}, len(queue))
 		var calledFrom []string
-		if LogLockTimeouts {
+		if m.LogLockTimeouts {
 			calledFrom = make([]string, len(queue))
 		}
 		// Send notification to all waiting
 		for i, n := range queue {
 			wait[i] = make(chan struct{})
-			if LogLockTimeouts {
+			if m.LogLockTimeouts {
 				calledFrom[i] = n.calledFrom
 			}
-			queue[i].n <- wait[i]
+			queue[i].n.c <- wait[i]
 		}
 
 		// Send notification to all function notifiers, but don't wait
-		for _, notifier := range shutdownFnQueue[stage] {
-			notifier.client <- make(chan struct{})
-			close(notifier.client)
+		for _, notifier := range m.shutdownFnQueue[stage] {
+			notifier.client.c <- make(chan struct{})
+			close(notifier.client.c)
 		}
 
 		// We don't lock while we are waiting for notifiers to return
-		sqM.Unlock()
+		m.sqM.Unlock()
 
 		// Wait for all to return, no more than the shutdown delay
 		timeout := time.After(to)
@@ -455,8 +423,8 @@ func Shutdown() {
 	brwait:
 		for i := range wait {
 			var tick <-chan time.Time
-			if LogLockTimeouts {
-				tick = time.Tick(StatusTimer)
+			if m.LogLockTimeouts {
+				tick = time.Tick(m.StatusTimer)
 			}
 		wloop:
 			for {
@@ -464,56 +432,56 @@ func Shutdown() {
 				case <-wait[i]:
 					break wloop
 				case <-timeout:
-					LoggerMu.Lock()
+					m.LoggerMu.Lock()
 					if len(calledFrom) > 0 {
-						srM.RLock()
+						m.srM.RLock()
 						if onTimeOutFn != nil {
 							onTimeOutFn(Stage{n: stage}, calledFrom[i])
 						}
-						srM.RUnlock()
-						Logger.Printf(ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
+						m.srM.RUnlock()
+						m.Logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
 					}
-					Logger.Printf(ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
-					LoggerMu.Unlock()
+					m.Logger.Printf(m.ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
+					m.LoggerMu.Unlock()
 					break brwait
 				case <-tick:
 					if len(calledFrom) > 0 {
-						LoggerMu.Lock()
-						Logger.Printf(WarningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
-						LoggerMu.Unlock()
+						m.LoggerMu.Lock()
+						m.Logger.Printf(m.WarningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
+						m.LoggerMu.Unlock()
 					}
 				}
 			}
 		}
-		sqM.Lock()
+		m.sqM.Lock()
 	}
 	// Reset - mainly for tests.
-	shutdownQueue = [4][]iNotifier{}
-	shutdownFnQueue = [4][]fnNotify{}
-	close(shutdownFinished)
-	sqM.Unlock()
+	m.shutdownQueue = [4][]iNotifier{}
+	m.shutdownFnQueue = [4][]fnNotify{}
+	close(m.shutdownFinished)
+	m.sqM.Unlock()
 }
 
 // Started returns true if shutdown has been started.
 // Note that shutdown can have been started before you check the value.
-func Started() bool {
-	srM.RLock()
-	started := shutdownRequested
-	srM.RUnlock()
+func (m *Manager) Started() bool {
+	m.srM.RLock()
+	started := m.shutdownRequested
+	m.srM.RUnlock()
 	return started
 }
 
 // StartedCh returns a channel that is closed once shutdown has started.
-func StartedCh() <-chan struct{} {
-	return shutdownRequestedCh
+func (m *Manager) StartedCh() <-chan struct{} {
+	return m.shutdownRequestedCh
 }
 
 // Wait will wait until shutdown has finished.
 // This can be used to keep a main function from exiting
 // until shutdown has been called, either by a goroutine
 // or a signal.
-func Wait() {
-	<-shutdownFinished
+func (m *Manager) Wait() {
+	<-m.shutdownFinished
 }
 
 // Lock will signal that you have a function running,
@@ -535,21 +503,21 @@ func Wait() {
 //
 // For easier debugging you can send a context that will be printed if the lock
 // times out. All supplied context is printed with '%v' formatting.
-func Lock(ctx ...interface{}) func() {
-	srM.RLock()
-	if shutdownRequested {
-		srM.RUnlock()
+func (m *Manager) Lock(ctx ...interface{}) func() {
+	m.srM.RLock()
+	if m.shutdownRequested {
+		m.srM.RUnlock()
 		return nil
 	}
-	wg.Add(1)
-	onTimeOutFn := onTimeOut
-	srM.RUnlock()
+	m.wg.Add(1)
+	onTimeOutFn := m.onTimeOut
+	m.srM.RUnlock()
 	var release = make(chan struct{}, 0)
-	var timeout = time.After(timeouts[0])
+	var timeout = time.After(m.timeouts[0])
 
 	// Store what called this
 	var calledFrom string
-	if LogLockTimeouts {
+	if m.LogLockTimeouts {
 		_, file, line, _ := runtime.Caller(1)
 		if len(ctx) > 0 {
 			calledFrom = fmt.Sprintf("%v. ", ctx)
@@ -561,16 +529,16 @@ func Lock(ctx ...interface{}) func() {
 		select {
 		case <-timeout:
 			if onTimeOutFn != nil {
-				onTimeOutFn(StagePS, calledFrom)
+				onTimeOutFn(m.StagePS, calledFrom)
 			}
-			if LogLockTimeouts {
-				LoggerMu.Lock()
-				Logger.Printf(WarningPrefix+"Lock expired! %s", calledFrom)
-				LoggerMu.Unlock()
+			if m.LogLockTimeouts {
+				m.LoggerMu.Lock()
+				m.Logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
+				m.LoggerMu.Unlock()
 			}
 		case <-release:
 		}
 		wg.Done()
-	}(wg)
+	}(&m.wg)
 	return func() { close(release) }
 }

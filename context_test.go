@@ -1,5 +1,6 @@
 // Copyright (c) 2015 Klaus Post, released under MIT License. See LICENSE file.
 
+//go:build go1.7
 // +build go1.7
 
 package shutdown
@@ -21,11 +22,11 @@ type otherContext struct {
 }
 
 func TestCancelCtx(t *testing.T) {
-	reset()
-	SetTimeout(time.Second)
-	defer close(startTimer(t))
+	m := NewManager()
+	m.SetTimeout(time.Second)
+	defer close(startTimer(m, t))
 
-	c1, cc := CancelCtx(context.Background())
+	c1, cc := m.CancelCtx(context.Background())
 	defer cc()
 
 	if got, want := fmt.Sprint(c1), "context.Background.WithCancel"; got != want {
@@ -52,7 +53,7 @@ func TestCancelCtx(t *testing.T) {
 		}
 	}
 
-	Shutdown()
+	m.Shutdown()
 	time.Sleep(100 * time.Millisecond) // let cancellation propagate
 
 	for i, c := range contexts {
@@ -68,14 +69,14 @@ func TestCancelCtx(t *testing.T) {
 }
 
 func TestCancelCtxN(t *testing.T) {
-	reset()
-	SetTimeout(time.Second)
-	defer close(startTimer(t))
-	stages := []Stage{StagePS, Stage1, Stage2, Stage3}
+	m := NewManager()
+	m.SetTimeout(time.Second)
+	defer close(startTimer(m, t))
+	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
 	contexts := []context.Context{}
 
 	for _, stage := range stages {
-		c1, cc := CancelCtxN(context.Background(), stage)
+		c1, cc := m.CancelCtxN(context.Background(), stage)
 		defer cc()
 		if got, want := fmt.Sprint(c1), "context.Background.WithCancel"; got != want {
 			t.Errorf("c1.String() = %q want %q", got, want)
@@ -101,7 +102,7 @@ func TestCancelCtxN(t *testing.T) {
 		}
 	}
 
-	Shutdown()
+	m.Shutdown()
 	time.Sleep(100 * time.Millisecond) // let cancellation propagate
 
 	for i, c := range contexts {
@@ -117,14 +118,14 @@ func TestCancelCtxN(t *testing.T) {
 }
 
 func TestCancelCtxNShutdown(t *testing.T) {
-	reset()
-	SetTimeout(time.Second)
-	defer close(startTimer(t))
-	stages := []Stage{StagePS, Stage1, Stage2, Stage3}
+	m := NewManager()
+	m.SetTimeout(time.Second)
+	defer close(startTimer(m, t))
+	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
 	contexts := []context.Context{}
 
 	for _, stage := range stages {
-		c1, cancel1 := CancelCtxN(context.Background(), stage)
+		c1, cancel1 := m.CancelCtxN(context.Background(), stage)
 		o := otherContext{c1}
 		c2, cc := context.WithCancel(o)
 		defer cc()
@@ -146,15 +147,15 @@ func TestCancelCtxNShutdown(t *testing.T) {
 	}
 
 	// Ensure shutdown is not blocking
-	Shutdown()
+	m.Shutdown()
 }
 
 func TestCancelCtxX(t *testing.T) {
-	reset()
-	SetTimeout(time.Second)
-	defer close(startTimer(t))
+	m := NewManager()
+	m.SetTimeout(time.Second)
+	defer close(startTimer(m, t))
 
-	c1, _ := CancelCtx(xcontext.Background())
+	c1, _ := m.CancelCtx(xcontext.Background())
 
 	if got, want := fmt.Sprint(c1), "context.Background.WithCancel"; got != want {
 		t.Errorf("c1.String() = %q want %q", got, want)
@@ -180,7 +181,7 @@ func TestCancelCtxX(t *testing.T) {
 		}
 	}
 
-	Shutdown()
+	m.Shutdown()
 	time.Sleep(100 * time.Millisecond) // let cancellation propagate
 
 	for i, c := range contexts {
