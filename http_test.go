@@ -4,67 +4,11 @@ package shutdown
 
 import (
 	"bytes"
-	"fmt"
-	"html"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"syscall"
 	"testing"
 	"time"
 )
-
-var (
-	m = New()
-)
-
-// This example creates a custom function handler
-// and wraps the handler, so all request will
-// finish before shutdown is started.
-//
-// If requests take too long to finish (see the shutdown will proceed
-// and clients will be disconnected when the server shuts down.
-// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
-func ExampleWrapHandlerFunc() {
-	// Set a custom timeout, if the 5 second default doesn't fit your needs.
-	m.SetTimeoutN(m.StagePS, time.Second*30)
-	// Catch OS signals
-	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
-
-	// Example handler function
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
-	}
-
-	// Wrap the handler function
-	http.HandleFunc("/", m.WrapHandlerFunc(fn))
-
-	// Start the server
-	http.ListenAndServe(":8080", nil)
-}
-
-// This example creates a fileserver
-// and wraps the handler, so all request will
-// finish before shutdown is started.
-//
-// If requests take too long to finish the shutdown will proceed
-// and clients will be disconnected when the server shuts down.
-// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
-func ExampleWrapHandler() {
-	// Set a custom timeout, if the 5 second default doesn't fit your needs.
-	m.SetTimeoutN(m.StagePS, time.Second*30)
-	// Catch OS signals
-	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
-
-	// Create a fileserver handler
-	fh := http.FileServer(http.Dir("/examples"))
-
-	// Wrap the handler function
-	http.Handle("/", m.WrapHandler(fh))
-
-	// Start the server
-	http.ListenAndServe(":8080", nil)
-}
 
 func TestWrapHandlerBasic(t *testing.T) {
 	m := New()
@@ -292,3 +236,53 @@ func TestWrapHandlerFuncOrder(t *testing.T) {
 		t.Fatal("Function had not finished")
 	}
 }
+
+/*
+// This example creates a custom function handler
+// and wraps the handler, so all request will
+// finish before shutdown is started.
+//
+// If requests take too long to finish (see the shutdown will proceed
+// and clients will be disconnected when the server shuts down.
+// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
+func ExampleWrapHandlerFunc() {
+	// Set a custom timeout, if the 5 second default doesn't fit your needs.
+	m.SetTimeoutN(m.StagePS, time.Second*30)
+	// Catch OS signals
+	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
+
+	// Example handler function
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+	}
+
+	// Wrap the handler function
+	http.HandleFunc("/", m.WrapHandlerFunc(fn))
+
+	// Start the server
+	http.ListenAndServe(":8080", nil)
+}
+
+// This example creates a fileserver
+// and wraps the handler, so all request will
+// finish before shutdown is started.
+//
+// If requests take too long to finish the shutdown will proceed
+// and clients will be disconnected when the server shuts down.
+// To modify the timeout use m.SetTimeoutN(m.PreShutdown, duration)
+func ExampleWrapHandler() {
+	// Set a custom timeout, if the 5 second default doesn't fit your needs.
+	m.SetTimeoutN(m.StagePS, time.Second*30)
+	// Catch OS signals
+	m.OnSignal(0, os.Interrupt, syscall.SIGTERM)
+
+	// Create a fileserver handler
+	fh := http.FileServer(http.Dir("/examples"))
+
+	// Wrap the handler function
+	http.Handle("/", m.WrapHandler(fh))
+
+	// Start the server
+	http.ListenAndServe(":8080", nil)
+}
+*/

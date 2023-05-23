@@ -272,7 +272,7 @@ Don't think of the 3-stages as something that must do all stages of your shutdow
 
 ## examples
 
-There are examples in the [examples folder](https://github.com/eikmadsen/shutdown/tree/master/examples).
+There are examples in the [examples folder](https://github.com/eikmadsen/shutdown/tree/main/examples).
 
 ## license
 

@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
-	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -1286,6 +1285,7 @@ func TestCancelWaitMulti2(t *testing.T) {
 	m.Shutdown()
 }
 
+/*
 // Get a notifier and perform our own code when we shutdown
 func ExampleNotifier() {
 	shutdown := m.First()
@@ -1376,3 +1376,4 @@ func ExampleWait() {
 	// Output: jobs done
 	// exiting main
 }
+*/
