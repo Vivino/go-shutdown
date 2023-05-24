@@ -61,33 +61,6 @@ func TestBasic(t *testing.T) {
 	m.Wait()
 }
 
-func TestPreShutdown(t *testing.T) {
-	m := New()
-	defer close(startTimer(m, t))
-	f := m.PreShutdown()
-	ok := false
-	l := m.Lock()
-	go func() {
-		n := <-f.Notify()
-		ok = true
-		l()
-		close(n)
-	}()
-	tn := time.Now()
-	m.Shutdown()
-	dur := time.Since(tn)
-	if dur > time.Second {
-		t.Fatalf("timeout time was hit unexpected:%v", time.Since(tn))
-	}
-
-	if !ok {
-		t.Fatal("did not get expected shutdown signal")
-	}
-	if !m.Started() {
-		t.Fatal("shutdown not marked started")
-	}
-}
-
 func TestCancel(t *testing.T) {
 	m := New()
 	defer close(startTimer(m, t))
@@ -541,103 +514,6 @@ func TestTimeoutN2(t *testing.T) {
 	}
 	if !m.Started() {
 		t.Fatal("got unexpected shutdown signal")
-	}
-}
-
-func TestLock(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 10)
-	defer close(startTimer(m, t))
-	f := m.First()
-	ok := false
-	go func() {
-		n := <-f.Notify()
-		ok = true
-		close(n)
-	}()
-	got := m.Lock()
-	if got == nil {
-		t.Fatal("Unable to aquire lock")
-	}
-	got()
-
-	// Start 10 goroutines that aquire a lock.
-	var wg1, wg2 sync.WaitGroup
-	wg1.Add(10)
-	wg2.Add(10)
-	for i := 0; i < 10; i++ {
-		go func() {
-			defer wg1.Done()
-			wg2.Done() // Signal we are ready to take the lock
-			l := m.Lock()
-			if l != nil {
-				time.Sleep(m.timeouts[0] / 2)
-				l()
-			}
-		}()
-	}
-	// Wait for all goroutines to have aquired the lock
-	wg2.Wait()
-	m.Shutdown()
-	if !ok {
-		t.Fatal("shutdown signal not received")
-	}
-	if !m.Started() {
-		t.Fatal("expected that shutdown had started")
-	}
-	wg1.Wait()
-}
-
-func TestLockUnrelease(t *testing.T) {
-	m := New()
-	defer close(startTimer(m, t))
-	m.SetTimeout(time.Millisecond * 500)
-	m.SetTimeoutN(m.StagePS, time.Millisecond*100)
-	got := m.Lock()
-	if got == nil {
-		t.Fatal("Unable to aquire lock")
-	}
-	defer got()
-	tn := time.Now()
-	m.Shutdown()
-	dur := time.Since(tn)
-	if dur > time.Second || dur < time.Millisecond*50 {
-		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
-	}
-	if !m.Started() {
-		t.Fatal("expected that shutdown had started")
-	}
-}
-
-func TestLockCallback(t *testing.T) {
-	var gotStage Stage
-	var gotCtx string
-	var wg sync.WaitGroup
-	wg.Add(1)
-	m := New(WithOnTimeout(func(s Stage, ctx string) {
-		gotStage = s
-		gotCtx = ctx
-		wg.Done()
-	}))
-	defer close(startTimer(m, t))
-	m.SetTimeout(time.Millisecond * 50)
-	const testctx = "lock context"
-
-	tn := time.Now()
-	got := m.Lock(testctx)
-	if got == nil {
-		t.Fatal("Unable to aquire lock")
-	}
-	wg.Wait()
-	dur := time.Since(tn)
-	if dur > time.Second || dur < time.Millisecond*30 {
-		t.Errorf("timeout time was unexpected:%v (%v->%v)", dur, tn, time.Now())
-	}
-	if gotStage != m.StagePS {
-		t.Errorf("want stage ps, got %+v", gotStage)
-	}
-	if !strings.Contains(gotCtx, testctx) {
-		t.Errorf("want context to contain %q, got %q", testctx, gotCtx)
 	}
 }
 

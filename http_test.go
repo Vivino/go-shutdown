@@ -167,8 +167,8 @@ func TestWrapHandlerOrder(t *testing.T) {
 	<-waiting
 	tn := time.Now()
 	m.Shutdown()
-	dur := time.Since(tn)
-	if dur > time.Millisecond*400 {
+
+	if time.Since(tn) > time.Millisecond*400 {
 		t.Fatalf("timeout time was unexpected:%v", time.Since(tn))
 	}
 	close(completed)

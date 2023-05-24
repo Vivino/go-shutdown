@@ -79,28 +79,9 @@ type Manager struct {
 	shutdownRequested   atomic.Bool
 	shutdownRequestedCh chan struct{}
 	timeouts            [4]time.Duration
+	wg                  sync.WaitGroup
 
 	onTimeOut func(s Stage, ctx string)
-	wg        sync.WaitGroup
-}
-
-// SetTimeout sets maximum delay to wait for each stage to finish.
-// When the timeout has expired for a stage the next stage will be initiated.
-func (m *Manager) SetTimeout(d time.Duration) {
-	m.srM.Lock()
-	for i := range m.timeouts {
-		m.timeouts[i] = d
-	}
-	m.srM.Unlock()
-}
-
-// SetTimeoutN set maximum delay to wait for a specific stage to finish.
-// When the timeout expired for a stage the next stage will be initiated.
-// The stage can be obtained by using the exported variables called 'Stage1, etc.
-func (m *Manager) SetTimeoutN(s Stage, d time.Duration) {
-	m.srM.Lock()
-	m.timeouts[s.n] = d
-	m.srM.Unlock()
 }
 
 // PreShutdown will return a Notifier that will be fired as soon as the shutdown.
@@ -191,16 +172,18 @@ func (m *Manager) Exit(code int) {
 // This method is not safe to call concurrently, as a datarace for shutdownRequested is possible.
 // As shutdown is called
 func (m *Manager) Shutdown() {
+	m.srM.Lock()
 	// if the current value is false, then store true. If we couldn't store true,
 	// then shutdown is already initalized
 	if !m.shutdownRequested.CompareAndSwap(false, true) {
+		m.srM.Unlock()
 		// Wait till shutdown finished
 		<-m.shutdownFinished
 		return
 	}
-
 	close(m.shutdownRequestedCh)
 	lwg := &m.wg
+	m.srM.Unlock()
 
 	// Add a pre-shutdown function that waits for all locks to be released.
 	m.PreShutdownFn(func() {
@@ -322,11 +305,13 @@ func (m *Manager) Wait() {
 // For easier debugging you can send a context that will be printed if the lock
 // times out. All supplied context is printed with '%v' formatting.
 func (m *Manager) Lock(ctx ...interface{}) func() {
+	m.srM.RLock()
 	if m.shutdownRequested.Load() {
+		m.srM.RUnlock()
 		return nil
 	}
-
 	m.wg.Add(1)
+	m.srM.RUnlock()
 
 	var release = make(chan struct{})
 	var timeout = time.After(m.timeouts[0])
