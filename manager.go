@@ -13,10 +13,17 @@ import (
 )
 
 var (
+	// StagePS indicates the pre shutdown stage when waiting for locks to be released.
 	StagePS = Stage{0}
-	Stage1  = Stage{1}
-	Stage2  = Stage{2}
-	Stage3  = Stage{3}
+
+	// Stage1 Indicates first stage of timeouts.
+	Stage1 = Stage{1}
+
+	// Stage2 Indicates second stage of timeouts.
+	Stage2 = Stage{2}
+
+	// Stage3 indicates third stage of timeouts.
+	Stage3 = Stage{3}
 )
 
 // New returns an initialized shutdown manager
