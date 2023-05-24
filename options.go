@@ -26,23 +26,21 @@ func WithOnTimeout(fn func(Stage, string)) Option {
 	}
 }
 
-// TODO
-
-// SetTimeout sets maximum delay to wait for each stage to finish.
+// WithTimeout sets maximum delay to wait for each stage to finish.
 // When the timeout has expired for a stage the next stage will be initiated.
-func (m *Manager) SetTimeout(d time.Duration) {
-	m.srM.Lock()
-	for i := range m.timeouts {
-		m.timeouts[i] = d
+func WithTimeout(d time.Duration) Option {
+	return func(m *Manager) {
+		for i := range m.timeouts {
+			m.timeouts[i] = d
+		}
 	}
-	m.srM.Unlock()
 }
 
-// SetTimeoutN set maximum delay to wait for a specific stage to finish.
+// WithTimeoutN set maximum delay to wait for a specific stage to finish.
 // When the timeout expired for a stage the next stage will be initiated.
 // The stage can be obtained by using the exported variables called 'Stage1, etc.
-func (m *Manager) SetTimeoutN(s Stage, d time.Duration) {
-	m.srM.Lock()
-	m.timeouts[s.n] = d
-	m.srM.Unlock()
+func WithTimeoutN(s Stage, d time.Duration) Option {
+	return func(m *Manager) {
+		m.timeouts[s.n] = d
+	}
 }

@@ -12,14 +12,17 @@ import (
 	"time"
 )
 
+var (
+	StagePS = Stage{0}
+	Stage1  = Stage{1}
+	Stage2  = Stage{2}
+	Stage3  = Stage{3}
+)
+
 // New returns an initialized shutdown manager
 func New(options ...Option) *Manager {
 	m := &Manager{
 		logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
-		StagePS:             Stage{0},
-		Stage1:              Stage{1},
-		Stage2:              Stage{2},
-		Stage3:              Stage{3},
 		WarningPrefix:       "WARN: ",
 		ErrorPrefix:         "ERROR: ",
 		logLockTimeouts:     true,

@@ -106,8 +106,8 @@ func TestCancel2(t *testing.T) {
 }
 
 func TestCancelWait(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 100)
+	m := New(WithTimeout(time.Millisecond * 1000))
+
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok bool
@@ -124,8 +124,8 @@ func TestCancelWait(t *testing.T) {
 }
 
 func TestCancelWait2(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 1000)
+	m := New(WithTimeout(time.Millisecond * 1000))
+
 	defer close(startTimer(m, t))
 	f2 := m.First()
 	f := m.First()
@@ -155,8 +155,8 @@ func TestCancelWait2(t *testing.T) {
 // TestCancelWait3 assert that we can CancelWait, and that wait will wait until the
 // specified stage.
 func TestCancelWait3(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 1000)
+	m := New(WithTimeout(time.Millisecond * 1000))
+
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2, ok3 bool
@@ -208,8 +208,7 @@ func TestCancelWait3(t *testing.T) {
 // TestCancelWait4 assert that we can CancelWait on a previous stage,
 // and it doesn't block.
 func TestCancelWait4(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 100)
+	m := New(WithTimeout(time.Millisecond * 100))
 	defer close(startTimer(m, t))
 	f := m.Second()
 	var ok bool
@@ -244,9 +243,8 @@ func (l *logBuffer) WriteF(format string, a ...interface{}) {
 // TestContextLog assert that context is logged as expected.
 func TestContextLog(t *testing.T) {
 	var buf = &logBuffer{fn: t.Logf}
-	m := New(WithLogPrinter(buf.WriteF))
+	m := New(WithLogPrinter(buf.WriteF), WithTimeout(10*time.Millisecond))
 	defer close(startTimer(m, t))
-	m.SetTimeout(10 * time.Millisecond)
 
 	txt1 := "arbitrary text"
 	txt2 := "something else"
@@ -426,8 +424,8 @@ func TestWait(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 400)
+	m := New(WithTimeout(time.Millisecond * 400))
+
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
@@ -445,9 +443,8 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestTimeoutN(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Second * 2)
-	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
+	m := New(WithTimeout(time.Millisecond*2000), WithTimeoutN(Stage1, time.Millisecond*100))
+
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
@@ -470,9 +467,8 @@ func TestTimeoutCallback(t *testing.T) {
 	m := New(WithOnTimeout(func(s Stage, ctx string) {
 		gotStage = s
 		gotCtx = ctx
-	}))
-	m.SetTimeout(time.Second * 2)
-	m.SetTimeoutN(m.Stage1, time.Millisecond*100)
+	}), WithTimeout(time.Millisecond*2000), WithTimeoutN(Stage1, time.Millisecond*100))
+
 	defer close(startTimer(m, t))
 
 	const testctx = "lock context"
@@ -498,9 +494,8 @@ func TestTimeoutCallback(t *testing.T) {
 }
 
 func TestTimeoutN2(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 100)
-	m.SetTimeoutN(m.Stage2, time.Second*2)
+	m := New(WithTimeout(time.Millisecond*100), WithTimeoutN(Stage2, time.Second*2))
+
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
@@ -963,8 +958,8 @@ func TestFnSingleCancel(t *testing.T) {
 }
 
 func TestCancelMulti(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Second)
+	m := New(WithTimeout(time.Second))
+
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	for i := 0; i < 1000; i++ {
@@ -998,8 +993,8 @@ func TestCancelMulti(t *testing.T) {
 }
 
 func TestCancelMulti2(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Second)
+	m := New(WithTimeout(time.Second))
+
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	var wg sync.WaitGroup
@@ -1048,8 +1043,8 @@ func TestCancelMulti2(t *testing.T) {
 }
 
 func TestCancelWaitMulti(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 400)
+	m := New(WithTimeout(time.Millisecond * 400))
+
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	for i := 0; i < 1000; i++ {
@@ -1082,8 +1077,8 @@ func TestCancelWaitMulti(t *testing.T) {
 }
 
 func TestCancelWaitMulti2(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 400)
+	m := New(WithTimeout(time.Millisecond * 400))
+
 	defer close(startTimer(m, t))
 	rand.Seed(0xC0CAC01A)
 	var wg sync.WaitGroup

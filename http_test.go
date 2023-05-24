@@ -74,8 +74,8 @@ func TestWrapHandlerFuncBasic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerPanic(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Second)
+	m := New(WithTimeout(time.Second))
+
 	defer close(startTimer(m, t))
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
@@ -102,8 +102,8 @@ func TestWrapHandlerPanic(t *testing.T) {
 
 // Test if panics locks shutdown.
 func TestWrapHandlerFuncPanic(t *testing.T) {
-	m := New()
-	m.SetTimeout(time.Millisecond * 200)
+	m := New(WithTimeout(time.Millisecond * 200))
+
 	defer close(startTimer(m, t))
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
