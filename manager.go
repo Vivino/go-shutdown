@@ -24,12 +24,12 @@ func New(options ...Option) *Manager {
 		ErrorPrefix:         "ERROR: ",
 		logLockTimeouts:     true,
 		StatusTimer:         time.Minute,
-		shutdownFinished:    make(chan struct{}),
 		currentStage:        Stage{-1},
+		shutdownFinished:    make(chan struct{}),
 		shutdownRequestedCh: make(chan struct{}),
 		timeouts:            [4]time.Duration{5 * time.Second, 5 * time.Second, 5 * time.Second, 5 * time.Second},
 	}
-	m.shutdownRequested.Store(false)
+
 	for _, option := range options {
 		option(m)
 	}
@@ -210,7 +210,6 @@ func (m *Manager) Shutdown() {
 	m.sqM.Lock()
 	for stage := 0; stage < 4; stage++ {
 		m.srM.Lock()
-		to := m.timeouts[stage]
 		m.currentStage = Stage{stage}
 		m.srM.Unlock()
 
@@ -249,7 +248,7 @@ func (m *Manager) Shutdown() {
 		m.sqM.Unlock()
 
 		// Wait for all to return, no more than the shutdown delay
-		timeout := time.After(to)
+		timeout := time.After(m.timeouts[stage])
 
 	brwait:
 		for i := range wait {
@@ -280,9 +279,6 @@ func (m *Manager) Shutdown() {
 		}
 		m.sqM.Lock()
 	}
-	// Reset - mainly for tests.
-	m.shutdownQueue = [4][]iNotifier{}
-	m.shutdownFnQueue = [4][]fnNotify{}
 	close(m.shutdownFinished)
 	m.sqM.Unlock()
 }

@@ -113,18 +113,14 @@ func TestCancel2(t *testing.T) {
 	var ok, ok2 bool
 
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
 	}()
 	go func() {
-		select {
-		case n := <-f2.Notify():
-			ok2 = true
-			close(n)
-		}
+		n := <-f2.Notify()
+		ok2 = true
+		close(n)
 	}()
 	f.Cancel()
 	m.Shutdown()
@@ -163,18 +159,15 @@ func TestCancelWait2(t *testing.T) {
 	var ok, ok2 bool
 
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
+
 	}()
 	go func() {
-		select {
-		case n := <-f2.Notify():
-			ok2 = true
-			close(n)
-		}
+		n := <-f2.Notify()
+		ok2 = true
+		close(n)
 	}()
 	f.CancelWait()
 	m.Shutdown()
@@ -249,14 +242,11 @@ func TestCancelWait4(t *testing.T) {
 	var ok bool
 	f2 := m.First()
 	go func() {
-		select {
-		case n := <-f.Notify():
-			// Should not wait
-			f2.CancelWait()
-			ok = true
-			close(n)
-		}
-
+		n := <-f.Notify()
+		// Should not wait
+		f2.CancelWait()
+		ok = true
+		close(n)
 	}()
 	m.Shutdown()
 	if !ok {
@@ -324,18 +314,15 @@ func TestFnCancelWait(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			go func() {
-				wg.Done()
-				f2.CancelWait()
-			}()
-			wg.Wait()
-			time.Sleep(10 * time.Millisecond)
-			close(n)
-		}
-
+		n := <-f.Notify()
+		ok = true
+		go func() {
+			wg.Done()
+			f2.CancelWait()
+		}()
+		wg.Wait()
+		time.Sleep(10 * time.Millisecond)
+		close(n)
 	}()
 	m.Shutdown()
 	if !ok {
@@ -471,9 +458,7 @@ func TestTimeout(t *testing.T) {
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
-		select {
-		case <-f.Notify():
-		}
+		<-f.Notify()
 	}()
 	tn := time.Now()
 	m.Shutdown()
@@ -493,9 +478,7 @@ func TestTimeoutN(t *testing.T) {
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
-		select {
-		case <-f.Notify():
-		}
+		<-f.Notify()
 	}()
 	tn := time.Now()
 	m.Shutdown()
@@ -548,9 +531,7 @@ func TestTimeoutN2(t *testing.T) {
 	defer close(startTimer(m, t))
 	f := m.First()
 	go func() {
-		select {
-		case <-f.Notify():
-		}
+		<-f.Notify()
 	}()
 	tn := time.Now()
 	m.Shutdown()
@@ -570,11 +551,9 @@ func TestLock(t *testing.T) {
 	f := m.First()
 	ok := false
 	go func() {
-		select {
-		case n := <-f.Notify():
-			ok = true
-			close(n)
-		}
+		n := <-f.Notify()
+		ok = true
+		close(n)
 	}()
 	got := m.Lock()
 	if got == nil {
@@ -747,26 +726,18 @@ func TestRecursive(t *testing.T) {
 
 	var ok1, ok2, ok3 bool
 	go func() {
-		for {
-			select {
-			case n := <-t1.Notify():
-				ok1 = true
-				t2 := m.Second()
-				close(n)
-				select {
-				case n := <-t2.Notify():
-					ok2 = true
-					t3 := m.Third()
-					close(n)
-					select {
-					case n := <-t3.Notify():
-						ok3 = true
-						close(n)
-						return
-					}
-				}
-			}
-		}
+		n1 := <-t1.Notify()
+		ok1 = true
+		t2 := m.Second()
+		close(n1)
+
+		n2 := <-t2.Notify()
+		ok2 = true
+		t3 := m.Third()
+		close(n2)
+		n3 := <-t3.Notify()
+		ok3 = true
+		close(n3)
 	}()
 	if ok1 || ok2 || ok3 {
 		t.Fatal("shutdown has already happened", ok1, ok2, ok3)
