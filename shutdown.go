@@ -53,7 +53,7 @@ func (n Notifier) Valid() bool {
 	return n.c != nil && n.m != nil
 }
 
-// Notify returns a channel to listen to for shutdown events
+// Notify returns a channel to listen to for shutdown events.
 func (n Notifier) Notify() <-chan chan struct{} {
 	return n.c
 }

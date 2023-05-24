@@ -22,9 +22,9 @@ var (
 // New returns an initialized shutdown manager
 func New(options ...Option) *Manager {
 	m := &Manager{
-		StatusTimer:         time.Minute,
-		WarningPrefix:       "WARN: ",
-		ErrorPrefix:         "ERROR: ",
+		statusTimer:         time.Minute,
+		warningPrefix:       "WARN: ",
+		errorPrefix:         "ERROR: ",
 		logLockTimeouts:     true,
 		currentStage:        Stage{-1},
 		shutdownFinished:    make(chan struct{}),
@@ -41,15 +41,15 @@ func New(options ...Option) *Manager {
 
 // Manager encapsulates all state/settings previously stored at package level
 type Manager struct {
-	// WarningPrefix is printed before warnings.
-	WarningPrefix string
+	// warningPrefix is printed before warnings.
+	warningPrefix string
 
-	// ErrorPrefix is printed before errors.
-	ErrorPrefix string
+	// errorPrefix is printed before errors.
+	errorPrefix string
 
-	// StatusTimer is the time between logging which notifiers are waiting to finish.
+	// statusTimer is the time between logging which notifiers are waiting to finish.
 	// Should not be changed once shutdown has started.
-	StatusTimer time.Duration
+	statusTimer time.Duration
 
 	// logLockTimeouts enables log timeout warnings
 	// and notifier status updates.
@@ -68,9 +68,9 @@ type Manager struct {
 	srM                 sync.RWMutex // Mutex for below
 	shutdownRequested   atomic.Bool
 	shutdownRequestedCh chan struct{}
-	timeouts            [4]time.Duration
 	wg                  sync.WaitGroup
 
+	timeouts  [4]time.Duration
 	onTimeOut func(s Stage, ctx string)
 }
 
@@ -144,7 +144,10 @@ func (m *Manager) OnSignal(exitCode int, sig ...os.Signal) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, sig...)
 	go func() {
-		for range c {
+		select {
+		case <-m.shutdownRequestedCh:
+			return
+		case <-c:
 			m.Shutdown()
 			os.Exit(exitCode)
 		}
@@ -171,10 +174,10 @@ func (m *Manager) Shutdown() {
 		<-m.shutdownFinished
 		return
 	}
-	close(m.shutdownRequestedCh)
-	lwg := &m.wg
 	m.srM.Unlock()
 
+	close(m.shutdownRequestedCh)
+	lwg := &m.wg
 	// Add a pre-shutdown function that waits for all locks to be released.
 	m.PreShutdownFn(func() {
 		lwg.Wait()
@@ -227,7 +230,7 @@ func (m *Manager) Shutdown() {
 		for i := range wait {
 			var tick <-chan time.Time
 			if m.logLockTimeouts {
-				tick = time.NewTicker(m.StatusTimer).C
+				tick = time.NewTicker(m.statusTimer).C
 			}
 		wloop:
 			for {
@@ -239,13 +242,13 @@ func (m *Manager) Shutdown() {
 						if m.onTimeOut != nil {
 							m.onTimeOut(Stage{n: stage}, calledFrom[i])
 						}
-						m.logger.Printf(m.ErrorPrefix+"Notifier Timed Out: %s", calledFrom[i])
+						m.logger.Printf(m.errorPrefix+"Notifier Timed Out: %s", calledFrom[i])
 					}
-					m.logger.Printf(m.ErrorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
+					m.logger.Printf(m.errorPrefix+"Timeout waiting to shutdown, forcing shutdown stage %v.", stage)
 					break brwait
 				case <-tick:
 					if len(calledFrom) > 0 {
-						m.logger.Printf(m.WarningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
+						m.logger.Printf(m.warningPrefix+"Stage %d, waiting for notifier (%s)", stage, calledFrom[i])
 					}
 				}
 			}
@@ -324,7 +327,7 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 				m.onTimeOut(StagePS, calledFrom)
 			}
 			if m.logLockTimeouts {
-				m.logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
+				m.logger.Printf(m.warningPrefix+"Lock expired! %s", calledFrom)
 			}
 		case <-release:
 		}
@@ -351,7 +354,7 @@ func (m *Manager) onFunc(prio, depth int, fn func(), ctx []interface{}) Notifier
 			{
 				defer func() {
 					if r := recover(); r != nil {
-						m.logger.Printf(m.ErrorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
+						m.logger.Printf(m.errorPrefix+"Panic in shutdown function: %v (%v)", r, f.internal.calledFrom)
 						m.logger.Printf("%s", string(debug.Stack()))
 					}
 					if c != nil {

@@ -856,7 +856,7 @@ func TestStatusTimerFn(t *testing.T) {
 		}
 	}
 	var b bytes.Buffer
-	m := New(WithLogPrinter(func(f string, val ...interface{}) {
+	m := New(WithStatusTimer(time.Millisecond), WithLogPrinter(func(f string, val ...interface{}) {
 		b.WriteString(fmt.Sprintf(f+"\n", val...))
 	}))
 	m.FirstFn(func() {
@@ -865,7 +865,6 @@ func TestStatusTimerFn(t *testing.T) {
 	_, file, line, _ := runtime.Caller(0)
 	want := fmt.Sprintf("%s:%d", file, line-3)
 
-	m.StatusTimer = time.Millisecond
 	m.Shutdown()
 
 	if !strings.Contains(b.String(), want) {
@@ -882,7 +881,7 @@ func TestStatusTimerFn(t *testing.T) {
 
 func TestStatusTimer(t *testing.T) {
 	var b bytes.Buffer
-	m := New(WithLogPrinter(func(f string, val ...interface{}) {
+	m := New(WithStatusTimer(time.Millisecond), WithLogPrinter(func(f string, val ...interface{}) {
 		b.WriteString(fmt.Sprintf(f+"\n", val...))
 	}))
 	fn := m.First()
@@ -896,7 +895,7 @@ func TestStatusTimer(t *testing.T) {
 		time.Sleep(2 * time.Millisecond)
 		close(v)
 	}()
-	m.StatusTimer = time.Millisecond
+
 	wg.Wait()
 	m.Shutdown()
 	if !strings.Contains(b.String(), want) {

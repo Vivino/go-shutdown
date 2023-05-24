@@ -44,3 +44,24 @@ func WithTimeoutN(s Stage, d time.Duration) Option {
 		m.timeouts[s.n] = d
 	}
 }
+
+// WithWarningPrefix is printed before warnings.
+func WithWarningPrefix(s string) Option {
+	return func(m *Manager) {
+		m.warningPrefix = s
+	}
+}
+
+// WithErrorPrefix is printed before errors.
+func WithnErrorPrefix(s string) Option {
+	return func(m *Manager) {
+		m.warningPrefix = s
+	}
+}
+
+// WithStatusTimer is the time between logging which notifiers are waiting to finish.
+func WithStatusTimer(statusTimer time.Duration) Option {
+	return func(m *Manager) {
+		m.statusTimer = statusTimer
+	}
+}
