@@ -67,7 +67,7 @@ func TestCancelCtxN(t *testing.T) {
 	m := New(WithTimeout(time.Millisecond * 1000))
 
 	defer close(startTimer(m, t))
-	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
+	stages := []Stage{StagePS, Stage1, Stage2, Stage3}
 	contexts := []context.Context{}
 
 	for _, stage := range stages {
@@ -115,7 +115,7 @@ func TestCancelCtxN(t *testing.T) {
 func TestCancelCtxNShutdown(t *testing.T) {
 	m := New(WithTimeout(time.Millisecond * 1000))
 	defer close(startTimer(m, t))
-	stages := []Stage{m.StagePS, m.Stage1, m.Stage2, m.Stage3}
+	stages := []Stage{StagePS, Stage1, Stage2, Stage3}
 	contexts := []context.Context{}
 
 	for _, stage := range stages {

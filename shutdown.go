@@ -10,7 +10,7 @@
 package shutdown
 
 // Stage contains stage information.
-// Valid values for this is exported as variables StageN.
+// Valid values for this are exported as variables StageN.
 type Stage struct {
 	n int
 }

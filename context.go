@@ -8,7 +8,7 @@ import "context"
 // The returned context must be cancelled when done similar to
 // https://golang.org/pkg/context/#WithCancel
 func (m *Manager) CancelCtx(parent context.Context) (ctx context.Context, cancel context.CancelFunc) {
-	return m.cancelContext(parent, m.StagePS)
+	return m.cancelContext(parent, StagePS)
 }
 
 // CancelCtxN will cancel the supplied context at a supplied shutdown stage.

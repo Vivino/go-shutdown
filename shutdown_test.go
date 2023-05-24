@@ -485,7 +485,7 @@ func TestTimeoutCallback(t *testing.T) {
 	if !m.Started() {
 		t.Fatal("got unexpected shutdown signal")
 	}
-	if gotStage != m.Stage1 {
+	if gotStage != Stage1 {
 		t.Errorf("want stage 1, got %+v", gotStage)
 	}
 	if !strings.Contains(gotCtx, testctx) {

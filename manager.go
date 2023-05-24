@@ -22,15 +22,15 @@ var (
 // New returns an initialized shutdown manager
 func New(options ...Option) *Manager {
 	m := &Manager{
-		logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
+		StatusTimer:         time.Minute,
 		WarningPrefix:       "WARN: ",
 		ErrorPrefix:         "ERROR: ",
 		logLockTimeouts:     true,
-		StatusTimer:         time.Minute,
 		currentStage:        Stage{-1},
 		shutdownFinished:    make(chan struct{}),
 		shutdownRequestedCh: make(chan struct{}),
 		timeouts:            [4]time.Duration{5 * time.Second, 5 * time.Second, 5 * time.Second, 5 * time.Second},
+		logger:              LogPrinter(log.New(os.Stderr, "[shutdown]: ", log.LstdFlags)),
 	}
 
 	for _, option := range options {
@@ -41,19 +41,6 @@ func New(options ...Option) *Manager {
 
 // Manager encapsulates all state/settings previously stored at package level
 type Manager struct {
-
-	// StagePS indicates the pre shutdown stage when waiting for locks to be released.
-	StagePS Stage
-
-	// Stage1 Indicates first stage of timeouts.
-	Stage1 Stage
-
-	// Stage2 Indicates second stage of timeouts.
-	Stage2 Stage
-
-	// Stage3 indicates third stage of timeouts.
-	Stage3 Stage
-
 	// WarningPrefix is printed before warnings.
 	WarningPrefix string
 
@@ -334,7 +321,7 @@ func (m *Manager) Lock(ctx ...interface{}) func() {
 		select {
 		case <-timeout:
 			if m.onTimeOut != nil {
-				m.onTimeOut(m.StagePS, calledFrom)
+				m.onTimeOut(StagePS, calledFrom)
 			}
 			if m.logLockTimeouts {
 				m.logger.Printf(m.WarningPrefix+"Lock expired! %s", calledFrom)
