@@ -4,6 +4,13 @@ import "time"
 
 type Option func(*Manager)
 
+// WithOSExit toggles calling os.Exit.
+func WithOSExit(b bool) Option {
+	return func(m *Manager) {
+		m.performOSExit = b
+	}
+}
+
 // WithLogPrinter sets the logprinter
 func WithLogPrinter(fn func(format string, v ...interface{})) Option {
 	return func(m *Manager) {

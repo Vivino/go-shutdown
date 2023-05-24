@@ -22,6 +22,7 @@ var (
 // New returns an initialized shutdown manager
 func New(options ...Option) *Manager {
 	m := &Manager{
+		performOSExit:       true,
 		statusTimer:         time.Minute,
 		warningPrefix:       "WARN: ",
 		errorPrefix:         "ERROR: ",
@@ -41,6 +42,13 @@ func New(options ...Option) *Manager {
 
 // Manager encapsulates all state/settings previously stored at package level
 type Manager struct {
+	// performOSExit calls os.Exit() when shutdown is complete, if set to true.
+	performOSExit bool
+
+	// logLockTimeouts enables log timeout warnings
+	// and notifier status updates.
+	logLockTimeouts bool
+
 	// warningPrefix is printed before warnings.
 	warningPrefix string
 
@@ -50,10 +58,6 @@ type Manager struct {
 	// statusTimer is the time between logging which notifiers are waiting to finish.
 	// Should not be changed once shutdown has started.
 	statusTimer time.Duration
-
-	// logLockTimeouts enables log timeout warnings
-	// and notifier status updates.
-	logLockTimeouts bool
 
 	// logger used for output.
 	// This can be exchanged with your own using WithLogPrinter option.
@@ -149,15 +153,11 @@ func (m *Manager) OnSignal(exitCode int, sig ...os.Signal) {
 			return
 		case <-c:
 			m.Shutdown()
-			os.Exit(exitCode)
+			if m.performOSExit {
+				os.Exit(exitCode)
+			}
 		}
 	}()
-}
-
-// Exit performs shutdown operations and exits with the given exit code.
-func (m *Manager) Exit(code int) {
-	m.Shutdown()
-	os.Exit(code)
 }
 
 // Shutdown will signal all notifiers in three stages.
