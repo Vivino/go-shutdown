@@ -155,6 +155,7 @@ func (m *Manager) OnSignal(exitCode int, sig ...os.Signal) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, sig...)
 	go func() {
+		defer signal.Stop(c)
 		select {
 		case <-m.shutdownRequestedCh:
 			return
