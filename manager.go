@@ -181,10 +181,11 @@ func (m *Manager) Shutdown() {
 		<-m.shutdownFinished
 		return
 	}
+	lwg := &m.wg
 	m.srM.Unlock()
 
 	close(m.shutdownRequestedCh)
-	lwg := &m.wg
+
 	// Add a pre-shutdown function that waits for all locks to be released.
 	m.PreShutdownFn(func() {
 		lwg.Wait()
