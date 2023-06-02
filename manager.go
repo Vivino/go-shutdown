@@ -287,6 +287,11 @@ func (m *Manager) Wait() {
 	<-m.shutdownFinished
 }
 
+// CompletedCh returns a channel that will be closed when shutdown has completed
+func (m *Manager) CompletedCh() <-chan struct{} {
+	return m.shutdownFinished
+}
+
 // Lock will signal that you have a function running,
 // that you do not want to be interrupted by a shutdown.
 //
