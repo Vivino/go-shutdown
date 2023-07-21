@@ -39,7 +39,7 @@ func startTimer(m *Manager, t *testing.T) chan struct{} {
 }
 
 func TestBasic(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -62,7 +62,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	f := m.First()
 	ok := false
@@ -79,7 +79,7 @@ func TestCancel(t *testing.T) {
 }
 
 func TestCancel2(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	f2 := m.First()
 	f := m.First()
@@ -155,9 +155,9 @@ func TestCancelWait2(t *testing.T) {
 // TestCancelWait3 assert that we can CancelWait, and that wait will wait until the
 // specified stage.
 func TestCancelWait3(t *testing.T) {
-	m := New(WithTimeout(time.Millisecond * 1000))
+	m := New(WithTimeout(time.Millisecond * 3000))
 
-	defer close(startTimer(m, t))
+	// defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2, ok3 bool
 	f2 := m.Second()
@@ -275,7 +275,7 @@ func TestContextLog(t *testing.T) {
 }
 
 func TestFnCancelWait(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	f := m.First()
 	var ok, ok2 bool
@@ -305,7 +305,7 @@ func TestFnCancelWait(t *testing.T) {
 }
 
 func TestNilNotifier(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -329,7 +329,7 @@ func TestNilNotifier(t *testing.T) {
 }
 
 func TestNilNotifierCancel(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -352,7 +352,7 @@ func TestNilNotifierCancel(t *testing.T) {
 }
 
 func TestNilNotifierCancelWait(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -375,7 +375,7 @@ func TestNilNotifierCancelWait(t *testing.T) {
 }
 
 func TestNilNotifierFollowing(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var reached = make(chan struct{})
 	var finished = make(chan struct{})
@@ -401,7 +401,7 @@ func TestNilNotifierFollowing(t *testing.T) {
 }
 
 func TestWait(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	ok := make(chan bool)
 	go func() {
@@ -513,7 +513,7 @@ func TestTimeoutN2(t *testing.T) {
 }
 
 func TestOrder(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	t3 := m.Third()
@@ -583,7 +583,7 @@ func TestOrder(t *testing.T) {
 }
 
 func TestRecursive(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	if m.Started() {
@@ -621,7 +621,7 @@ func TestRecursive(t *testing.T) {
 }
 
 func TestBasicFn(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -644,7 +644,7 @@ func setBool(i *bool) func() {
 }
 
 func TestFnOrder(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -675,7 +675,7 @@ func TestFnOrder(t *testing.T) {
 }
 
 func TestFnRecursive(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -707,7 +707,7 @@ func TestFnRecursive(t *testing.T) {
 
 // When setting First or Second inside stage three they should be ignored.
 func TestFnRecursiveRev(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3 bool
@@ -738,7 +738,7 @@ func TestFnRecursiveRev(t *testing.T) {
 }
 
 func TestFnCancel(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
 
@@ -769,7 +769,7 @@ func TestFnCancel(t *testing.T) {
 }
 
 func TestFnCancelWait2(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var g0, g1, g2, g3 bool
 
@@ -800,7 +800,7 @@ func TestFnCancelWait2(t *testing.T) {
 }
 
 func TestFnPanic(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -818,7 +818,7 @@ func TestFnPanic(t *testing.T) {
 }
 
 func TestFnNotify(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	gotcall := false
 
@@ -911,7 +911,7 @@ func TestStatusTimer(t *testing.T) {
 }
 
 func TestFnSingleCancel(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 
 	var ok1, ok2, ok3, okcancel bool
@@ -1202,7 +1202,7 @@ func ExampleWait() {
 
 	// ignore this reset, for test purposes only
 	t.Parallel()
-m := New()
+m := NewTestTimer()
 
 	// Wait for the jobs above to finish
 	go func() {

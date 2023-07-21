@@ -10,8 +10,13 @@ import (
 	"time"
 )
 
+// newTestTimer returns a new time with longer default timeout to allow -race to complete
+func newTestTimer() *Manager {
+	return New(WithTimeout(time.Second * 300))
+}
+
 func TestWrapHandlerBasic(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var finished = false
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +47,7 @@ func TestWrapHandlerBasic(t *testing.T) {
 }
 
 func TestWrapHandlerFuncBasic(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var finished = false
 	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +135,7 @@ func TestWrapHandlerFuncPanic(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerOrder(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var finished = make(chan bool)
 	var wait = make(chan bool)
@@ -185,7 +190,7 @@ func TestWrapHandlerOrder(t *testing.T) {
 
 // Tests that shutdown doesn't complete until handler function has returned
 func TestWrapHandlerFuncOrder(t *testing.T) {
-	m := New()
+	m := newTestTimer()
 	defer close(startTimer(m, t))
 	var finished = make(chan bool)
 	var wait = make(chan bool)
