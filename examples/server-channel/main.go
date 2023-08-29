@@ -18,7 +18,7 @@ import (
 	"os"
 	"syscall"
 
-	shutdownp "github.com/eikmadsen/shutdown"
+	shutdownp "github.com/Vivino/go-shutdown"
 )
 
 var (

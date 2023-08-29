@@ -10,7 +10,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/eikmadsen/shutdown"
+	"github.com/Vivino/go-shutdown"
 )
 
 // This example shows a server that has logging to a file

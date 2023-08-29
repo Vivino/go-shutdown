@@ -1,3 +1,3 @@
-module github.com/eikmadsen/shutdown
+module github.com/Vivino/go-shutdown
 
 go 1.19

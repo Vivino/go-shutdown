@@ -6,7 +6,7 @@
 //
 // # See more information about the how to use it in the README.md file
 //
-// Package home: https://github.com/eikmadsen/shutdown
+// Package home: https://github.com/Vivino/go-shutdown
 package shutdown
 
 // Stage contains stage information.
