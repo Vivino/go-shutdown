@@ -2,7 +2,7 @@ package smocks
 
 import "context"
 
-// NeverStarts Started method always returns false, and channels are never closed
+// NeverStarts method always returns false, and channels are never closed
 type NeverStarts struct{}
 
 // Started returns false
